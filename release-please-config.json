@@ -7,6 +7,7 @@
     ".": {
       "release-type": "node",
       "package-name": "kraken-craft",
+      "initial-version": "0.1.0",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         { "type": "json", "path": "src-tauri/tauri.conf.json", "jsonpath": "$.version" },
