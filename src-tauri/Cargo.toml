@@ -1,0 +1,45 @@
+[package]
+name = "kraken-craft"
+version = "0.0.0"
+description = "kraken-craft: a Git GUI client"
+authors = ["kraken-craft"]
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "kraken_craft_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+git2 = { version = "0.21.0", default-features = false }
+notify = "8.2.0"
+thiserror = "2.0.21"
+tauri-plugin-dialog = "2.8.3"
+portable-pty = "0.9.0"
+encoding_rs = "0.8.42"
+tauri-plugin-notification = "2.7.0"
+keyring = { version = "3", features = ["windows-native", "apple-native", "linux-native"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "native-tls", "blocking"] }
+
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
+
+[dev-dependencies]
+tempfile = "3.27.0"
