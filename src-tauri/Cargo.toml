@@ -1,6 +1,6 @@
 [package]
 name = "kraken-craft"
-version = "0.1.0"
+version = "0.1.1"
 description = "kraken-craft: a Git GUI client"
 authors = ["kraken-craft"]
 edition = "2024"
