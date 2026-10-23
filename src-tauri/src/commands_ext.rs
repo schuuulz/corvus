@@ -4,6 +4,7 @@
 use crate::git::{self, cli, ext, Error, Result};
 use crate::integrations::{self as integ, Kind};
 use crate::settings::Settings;
+use crate::shell_prompt;
 use crate::system;
 use crate::terminal::{self, Terminals};
 use serde::Deserialize;
@@ -154,6 +155,12 @@ pub async fn term_shells() -> Result<Vec<terminal::Shell>> {
     Ok(terminal::shells())
 }
 
+/// Records the HEAD branch of `repo` and its graph colour for terminal prompts.
+#[tauri::command]
+pub async fn term_prompt_branch(app: AppHandle, repo: String, branch: String, color: String) -> Result<()> {
+    shell_prompt::write_head(&shell_prompt::dir(&app)?, &repo, &branch, &color)
+}
+
 #[tauri::command]
 pub async fn term_spawn(app: AppHandle, state: State<'_, Terminals>, id: u32, cwd: String, shell: String, cols: u16, rows: u16) -> Result<()> {
     terminal::spawn(app, &state, id, &cwd, &shell, cols, rows).map_err(Error::Msg)
@@ -250,8 +257,13 @@ pub async fn integration_issues(kind: Kind, host: String, repo: String) -> Resul
 }
 
 #[tauri::command]
-pub async fn integration_create_pr(kind: Kind, host: String, repo: String, source: String, target: String, title: String, body: String) -> Result<String> {
-    integ::create_pull_request(kind, &host, &repo, &source, &target, &title, &body).await
+pub async fn integration_repo_access(kind: Kind, host: String, repo: String) -> Result<integ::RepoAccess> {
+    integ::repo_access(kind, &host, &repo).await
+}
+
+#[tauri::command]
+pub async fn integration_create_pr(kind: Kind, host: String, repo: String, pr: integ::NewPullRequest) -> Result<integ::PullRequest> {
+    integ::create_pull_request(kind, &host, &repo, &pr).await
 }
 
 #[tauri::command]

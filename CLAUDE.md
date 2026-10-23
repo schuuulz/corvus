@@ -28,6 +28,7 @@ All frontend and backend code must be **extremely high quality, elegant, and eas
 - Use `Result` and `?` with meaningful errors (`git::Error`). No `unwrap()` / `expect()` on fallible runtime paths; they are allowed only for true invariants, with the reason stated.
 - Keep modules focused: git reads (`git2`), git writes (`cli`), outcomes, integrations, system.
 - Tauri commands stay thin: validate the input, call the domain function, return typed data.
+- Never enable Tauri's `devtools` feature: release builds must not expose the web inspector.
 - Every behaviour change comes with a test (unit tests in the module, and integration tests in `tests/git_ops.rs` using throwaway repos).
 - Keep `cargo test` clean and the build free of compiler warnings.
 
@@ -83,7 +84,7 @@ Examples: `feat(graph): one-click branch switch from the +N menu`, `fix(staging)
 - **feature → `dev`:** squash merge is fine. The PR title must be a valid conventional commit.
 - **`dev` → `main`:** use a **merge commit**, never squash. Each commit must reach release-please.
 - **Release PR** (`chore(main): release …`, opened by release-please): merge it as-is. Don't edit its title, don't squash or rebase it, and don't delete its branch while it is open.
-- **After every release, sync `main` back into `dev`:** `git checkout dev && git pull && git merge origin/main && git push`.
+- **After every release, `main` is synced back into `dev` automatically** by the `sync-dev` job in `release.yml`. If that job fails (merge conflict), sync by hand: `git checkout dev && git pull && git merge origin/main && git push`.
 
 ## Versioning and releases (release-please)
 

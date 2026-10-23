@@ -6,6 +6,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Plus, TerminalSquare, X } from "lucide-react";
 import { ext } from "../api";
 import { useG, useStore } from "../store";
+import { laneColor } from "./ui";
 
 let nextId = 1;
 
@@ -93,7 +94,23 @@ function Session({ id, cwd, visible }: { id: number; cwd: string; visible: boole
   return <div ref={host} className={`term-body${dim && !focused ? " dim" : ""}`} style={{ display: visible ? "block" : "none" }} />;
 }
 
+/**
+ * Keeps the terminal prompt's branch colour in step with the graph: the
+ * prompt scripts read the HEAD branch's lane colour from a file the backend
+ * writes. Failing to write only leaves the prompt in its default green.
+ */
+function usePromptBranch(repo: string) {
+  const graph = useStore((s) => s.repos[repo]?.graph);
+  const branch = useStore((s) => s.repos[repo]?.info?.headBranch);
+  const head = graph?.rows.find((r) => r.isHead);
+  const color = head && graph ? laneColor(head.color, graph.trunks) : null;
+  useEffect(() => {
+    if (branch && color) ext.termPromptBranch(repo, branch, color).catch(() => {});
+  }, [repo, branch, color]);
+}
+
 export default function TerminalDock({ cwd }: { cwd: string }) {
+  usePromptBranch(cwd);
   const [sessions, setSessions] = useState<{ id: number; cwd: string }[]>(() => [{ id: nextId++, cwd }]);
   const [active, setActive] = useState(sessions[0].id);
   const { set } = useStore.getState();

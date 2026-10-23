@@ -298,3 +298,38 @@ fn gitflow_init_rejects_missing_branches() {
     let err = ext::gitflow_init(&p, "master", "dev", "feature/", "release/", "hotfix/", "").unwrap_err().to_string();
     assert!(err.contains("master") && err.contains("dev"), "lists every missing branch: {err}");
 }
+/// Parents of the commit `path` has checked out.
+fn head_parents(path: &str) -> usize {
+    git::open(path).unwrap().head().unwrap().peel_to_commit().unwrap().parent_count()
+}
+
+#[test]
+fn pull_fast_forwards_if_possible_and_merges_otherwise() {
+    let (_o, origin) = repo();
+    write(&origin, "a.txt", "base\n");
+    commit_all(&origin, "base");
+    let dir = tempfile::tempdir().unwrap();
+    let clone = dir.path().join("clone").to_string_lossy().replace('\\', "/");
+    sh(&origin, &["clone", "-q", &origin, &clone]);
+    for (key, value) in [("user.name", "Test"), ("user.email", "t@example.com"), ("commit.gpgsign", "false")] {
+        sh(&clone, &["config", key, value]);
+    }
+
+    // Only the upstream moved: a plain fast-forward, no merge commit.
+    write(&origin, "b.txt", "upstream\n");
+    commit_all(&origin, "upstream 1");
+    outcome::pull(&clone, ops::PullMode::Ff, |_| {}).unwrap();
+    assert_eq!(read(&clone, "b.txt"), "upstream\n");
+    assert_eq!(head_parents(&clone), 1);
+
+    // Both sides moved: fast-forward only refuses, the default merges.
+    write(&origin, "c.txt", "upstream\n");
+    commit_all(&origin, "upstream 2");
+    write(&clone, "d.txt", "local\n");
+    commit_all(&clone, "local");
+    assert!(ops::pull(&clone, ops::PullMode::FfOnly, |_| {}).is_err());
+    let o = outcome::pull(&clone, ops::PullMode::Ff, |_| {}).unwrap();
+    assert_eq!(o.status, OpStatus::Ok);
+    assert_eq!(head_parents(&clone), 2);
+    assert_eq!(read(&clone, "c.txt"), "upstream\n");
+}

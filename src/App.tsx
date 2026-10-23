@@ -4,7 +4,8 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import { api, ext } from "./api";
 import * as A from "./actions";
-import { useNarrow } from "./hooks";
+import { useBrowserChromeGuard } from "./browserChrome";
+import { useNarrow, useRepoIntegrationSync } from "./hooks";
 import { g, NEW_TAB, useG, useRepo, useStore } from "./store";
 import CommitGraph from "./components/CommitGraph";
 import RefsPanel from "./components/RefsPanel";
@@ -18,7 +19,8 @@ import NewTab from "./components/NewTab";
 import GitflowPanel from "./components/GitflowPanel";
 import { Blame, FileHistory } from "./components/FileViews";
 import { ActivityLog, Banner, StatusBar, TabBar, Toolbar } from "./components/Chrome";
-import { CloneDialog, CommandPalette, CreatePullRequest, Shortcuts } from "./components/Modals";
+import { CloneDialog, CommandPalette, Shortcuts } from "./components/Modals";
+import CreatePullRequest from "./components/CreatePullRequest";
 import { ContextMenu, Dialog, Toasts } from "./components/Overlays";
 import { Splitter } from "./components/ui";
 import PreferencesView from "./prefs/PreferencesView";
@@ -263,9 +265,11 @@ export default function App() {
   const labels = useG("toolbarLabels");
   const modal = useStore((s) => s.modal);
   useShortcuts();
+  useBrowserChromeGuard();
   useBackendConfig();
   useAutoFetch();
   useGraphPrefs();
+  useRepoIntegrationSync();
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -308,7 +312,7 @@ export default function App() {
       {modal === "clone" && <CloneDialog />}
       {modal === "shortcuts" && <Shortcuts />}
       {modal && typeof modal === "object" && modal.kind === "rebase" && <InteractiveRebase base={modal.base} />}
-      {modal && typeof modal === "object" && modal.kind === "pr" && <CreatePullRequest branch={modal.branch} />}
+      {modal && typeof modal === "object" && modal.kind === "pr" && <CreatePullRequest branch={modal.branch} base={modal.base} />}
       <Dialog />
       <ContextMenu />
       <Toasts />

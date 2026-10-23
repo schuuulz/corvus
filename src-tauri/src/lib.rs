@@ -5,6 +5,7 @@ pub mod integrations;
 mod migration;
 pub mod settings;
 pub mod system;
+mod shell_prompt;
 mod terminal;
 mod watcher;
 
@@ -102,6 +103,7 @@ pub fn run() {
             open_terminal,
             open_merge_tool,
             term_shells,
+            term_prompt_branch,
             term_spawn,
             term_write,
             term_resize,
@@ -120,6 +122,7 @@ pub fn run() {
             integration_disconnect,
             integration_pulls,
             integration_issues,
+            integration_repo_access,
             integration_create_pr,
             integration_add_ssh_key,
             parse_remote,

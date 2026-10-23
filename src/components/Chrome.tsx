@@ -5,7 +5,7 @@ import {
   Trash2, Undo2, X, ZoomIn,
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
-import { api, ext, LogEntry } from "../api";
+import { api, ext, LogEntry, PullMode } from "../api";
 import * as A from "../actions";
 import { t } from "../i18n";
 import { MenuEntry, NEW_TAB, useG, useR, useRepo, useStore } from "../store";
@@ -116,10 +116,18 @@ function ConflictChip() {
   );
 }
 
+const PULL_MODES: { mode: PullMode; label: string }[] = [
+  { mode: "ff", label: "fast-forward if possible" },
+  { mode: "ff-only", label: "fast-forward only" },
+  { mode: "rebase", label: "rebase" },
+];
+
 export function Toolbar() {
   const { repo, data } = useRepo();
   const busy = useStore((s) => s.busy);
   const pullMode = useG("pullMode");
+  // A mode saved by an older version ("merge") reads as the default.
+  const pull = PULL_MODES.find((m) => m.mode === pullMode) ?? PULL_MODES[0];
   const redoCount = useStore((s) => (repo ? s.redo[repo]?.length ?? 0 : 0));
   const search = useStore((s) => s.search);
   const tabs = useStore((s) => s.tabs);
@@ -170,7 +178,7 @@ export function Toolbar() {
         <Tool icon={<Undo2 size={17} />} label="Undo" onClick={A.undo} disabled={!!busy} title="Undo (Ctrl+Z)" />
         <Tool icon={<Redo2 size={17} />} label="Redo" onClick={A.redo} disabled={!!busy || !redoCount} title="Redo (Ctrl+Y)" />
         <div className="tool-sep" />
-        <Tool icon={<ArrowDownToLine size={17} />} label="Pull" badge={local?.behind} onClick={A.pull} disabled={!!busy} title={`Pull (${pullMode})`} />
+        <Tool icon={<ArrowDownToLine size={17} />} label="Pull" badge={local?.behind} onClick={A.pull} disabled={!!busy} title={`Pull (${pull.label})`} />
         <button
           className="tool caret-btn"
           title="Pull options"
@@ -178,9 +186,7 @@ export function Toolbar() {
             openMenu(e, [
               { label: "Fetch all", action: () => A.fetchAll() },
               "sep",
-              { label: `${pullMode === "ff-only" ? "● " : "   "}Pull (fast-forward if possible)`, action: () => setG("pullMode", "ff-only") },
-              { label: `${pullMode === "merge" ? "● " : "   "}Pull (merge)`, action: () => setG("pullMode", "merge") },
-              { label: `${pullMode === "rebase" ? "● " : "   "}Pull (rebase)`, action: () => setG("pullMode", "rebase") },
+              ...PULL_MODES.map((m) => ({ label: `${m === pull ? "● " : "   "}Pull (${m.label})`, action: () => setG("pullMode", m.mode) })),
             ])
           }
         >
@@ -200,7 +206,7 @@ export function Toolbar() {
                     await A.push(true);
                 },
               },
-              ...(head ? [{ label: "Create pull request…", action: () => set({ modal: { kind: "pr" as const, branch: head } }) }] : []),
+              ...(head && A.pullRequestHost() ? [{ label: "Create pull request…", action: () => A.openPullRequest(head) }] : []),
             ])
           }
         >
