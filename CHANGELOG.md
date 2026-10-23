@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.3.0](https://github.com/schuuulz/corvus/compare/corvus-v0.2.0...corvus-v0.3.0) (2026-10-23)
+
+
+### Features
+
+* **graph:** highlight branch names in the pull request menu item ([6b0f92d](https://github.com/schuuulz/corvus/commit/6b0f92d3e9bc1e6ac3afea53b532ccb190a68ac7))
+* **graph:** open pull requests from the branch menu ([1fb7ab2](https://github.com/schuuulz/corvus/commit/1fb7ab2bfdff13262237073b92db0e39ac3d44d8))
+* **graph:** open pull requests from the branch menu ([0372c26](https://github.com/schuuulz/corvus/commit/0372c268bd7bd2f6cf966e8507d2e323789f7e40))
+* **graph:** resizable columns, compact graph and one ref per row ([9043b7b](https://github.com/schuuulz/corvus/commit/9043b7bc09436b15360b89a343e2d4cfceb9a90e))
+* **graph:** resizable columns, compact graph and one ref per row ([0ad3f87](https://github.com/schuuulz/corvus/commit/0ad3f87d3d22ec378aac2e2fd55095f471b8f9a1))
+* open pull requests from the graph, resizable columns and a branch-aware terminal ([f1e4a7f](https://github.com/schuuulz/corvus/commit/f1e4a7f59e783549c0084fe2f3744cddcca2e28d))
+* **terminal:** show the current branch in the prompt, in its graph colour ([f6c248c](https://github.com/schuuulz/corvus/commit/f6c248c2fa178e8919fb5025180db242c0309b0a))
+* **terminal:** show the current branch in the prompt, in its graph colour ([27f58c5](https://github.com/schuuulz/corvus/commit/27f58c5237df1910b486b90ee161e1103204a565))
+* **ui:** hide the browser menu and shortcuts in release builds ([fbad8f6](https://github.com/schuuulz/corvus/commit/fbad8f6dc3a13355ee893e4356a9660b527751c2))
+
+
+### Bug Fixes
+
+* **graph:** drop the trailing ellipsis from the pull request menu item ([2919937](https://github.com/schuuulz/corvus/commit/2919937a33f9d7e77784edc301058080fbc9b70e))
+* **integrations:** accept a full URL as the self-hosted domain ([ccce08f](https://github.com/schuuulz/corvus/commit/ccce08fff0f98c02f7df68b7e1fdae41797c5b60))
+* **pull:** fast-forward if possible by default ([3e83249](https://github.com/schuuulz/corvus/commit/3e8324947f6cb01e063d27773c04c894b59971d5))
+* **ui:** keep context menus fully on screen ([569631e](https://github.com/schuuulz/corvus/commit/569631e6d59be1b099304b473cbe15e14b73a859))
+* **ui:** open menus triggered by a click ([eaa8728](https://github.com/schuuulz/corvus/commit/eaa8728e4c353be3d918b53daf530eebc704b915))
+
 ## [0.2.0](https://github.com/schuuulz/corvus/compare/corvus-v0.1.1...corvus-v0.2.0) (2026-10-23)
 
 
