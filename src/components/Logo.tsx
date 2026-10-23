@@ -1,10 +1,11 @@
 // Corvus mark: a faceted raven head with a glowing emerald eye and a commit
-// graph beside it. Mirrors app-icon.svg without its container, so it stays
-// legible at tab-bar size. Brand colours are fixed, not theme tokens.
+// graph beside it. Mirrors app-icon.svg without its container. The facets
+// are a few steps lighter than the icon's, because at tab-bar size the icon's
+// shades vanish into the dark UI. Brand colours are fixed, not theme tokens.
 
 // Slate shades from the darkest facet to the most lit one.
-const SLATE = { shadow: "#19222d", deep: "#1e293b", body: "#243247", lit: "#2b3a4f", crown: "#334155" };
-const EDGE = "#475569";
+const SLATE = { shadow: "#334155", deep: "#3b4a60", body: "#475569", lit: "#526179", crown: "#64748b" };
+const EDGE = "#94a3b8";
 const EMERALD = "#10b981";
 const EYE = "#00ff9d";
 const VOID = "#0b0f12";
