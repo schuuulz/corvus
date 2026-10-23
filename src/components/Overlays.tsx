@@ -3,16 +3,30 @@ import { AlertTriangle, CheckCircle2, Info, Loader2, X, XCircle } from "lucide-r
 import { t } from "../i18n";
 import { Toast, TOAST_DURATION, useG, useStore } from "../store";
 
+/** Gap kept between a menu and the window edges. */
+const EDGE = 4;
+
+/**
+ * Where one side of a menu starts: at the click when it fits, flipped to end
+ * at the click when it doesn't, and always inside the window.
+ */
+function placeAlong(click: number, extent: number, room: number): number {
+  const start = click + extent <= room - EDGE ? click : click - extent;
+  return Math.max(EDGE, Math.min(start, room - extent - EDGE));
+}
+
 export function ContextMenu() {
   const menu = useStore((s) => s.menu);
   const set = useStore((s) => s.set);
   const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [placed, setPlaced] = useState<{ menu: typeof menu; left: number; top: number } | null>(null);
 
+  // A new menu first renders hidden at the origin, where it can size itself
+  // against the whole window; it is measured and placed before the paint.
   useLayoutEffect(() => {
     if (!menu || !ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    setPos({ x: Math.min(menu.x, window.innerWidth - r.width - 4), y: Math.min(menu.y, window.innerHeight - r.height - 4) });
+    const { width, height } = ref.current.getBoundingClientRect();
+    setPlaced({ menu, left: placeAlong(menu.x, width, window.innerWidth), top: placeAlong(menu.y, height, window.innerHeight) });
   }, [menu]);
 
   useEffect(() => {
@@ -28,7 +42,12 @@ export function ContextMenu() {
 
   if (!menu) return null;
   return (
-    <div className="menu" ref={ref} style={{ left: pos.x, top: pos.y }} onContextMenu={(e) => e.preventDefault()}>
+    <div
+      className="menu"
+      ref={ref}
+      style={placed?.menu === menu ? { left: placed.left, top: placed.top } : { left: 0, top: 0, visibility: "hidden" }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       {menu.items.map((it, i) =>
         it === "sep" ? (
           <div key={i} className="menu-sep" />
