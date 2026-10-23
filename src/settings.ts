@@ -82,7 +82,7 @@ export const GLOBAL_DEFAULTS = {
   rightCollapsed: false,
   terminalHeight: 260,
   zoom: 1,
-  colWidths: { refs: 190, author: 140, date: 150, sha: 70 } as Record<string, number>,
+  colWidths: { refs: 190, message: 520, author: 140, date: 150, sha: 70 } as Record<string, number>,
   tabs: [] as string[],
   recent: [] as string[],
 };
