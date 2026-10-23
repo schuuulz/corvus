@@ -32,10 +32,15 @@ export function ContextMenu() {
   useEffect(() => {
     if (!menu) return;
     const close = () => set({ menu: null });
-    window.addEventListener("click", close);
+    // A press outside closes the menu. Listening to `click` instead would
+    // close a menu opened by a click (toolbar carets) during that same click.
+    const closeOutside = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) close();
+    };
+    window.addEventListener("pointerdown", closeOutside);
     window.addEventListener("blur", close);
     return () => {
-      window.removeEventListener("click", close);
+      window.removeEventListener("pointerdown", closeOutside);
       window.removeEventListener("blur", close);
     };
   }, [menu, set]);

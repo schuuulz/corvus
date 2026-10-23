@@ -117,13 +117,33 @@ pub fn fetch(path: &str, progress: impl FnMut(&str)) -> Result<()> {
     ok(cli::run_streaming(path, &["fetch", "--all", "--prune", "--progress"], progress))
 }
 
-pub fn pull(path: &str, mode: &str, progress: impl FnMut(&str)) -> Result<()> {
-    let flag = match mode {
-        "rebase" => "--rebase",
-        "merge" => "--no-rebase",
-        _ => "--ff-only",
-    };
-    ok(cli::run_streaming(path, &["pull", "--progress", flag], progress))
+/// How `pull` integrates the upstream changes.
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum PullMode {
+    /// Fast-forward when possible, otherwise create a merge commit.
+    /// "merge" is what earlier versions saved for this mode.
+    #[serde(alias = "merge")]
+    Ff,
+    /// Fast-forward only; fails when the branches have diverged.
+    FfOnly,
+    /// Replay local commits on top of the upstream.
+    Rebase,
+}
+
+impl PullMode {
+    fn flags(self) -> &'static [&'static str] {
+        match self {
+            PullMode::Ff => &["--no-rebase", "--ff"],
+            PullMode::FfOnly => &["--ff-only"],
+            PullMode::Rebase => &["--rebase"],
+        }
+    }
+}
+
+pub fn pull(path: &str, mode: PullMode, progress: impl FnMut(&str)) -> Result<()> {
+    let args = [&["pull", "--progress"], mode.flags()].concat();
+    ok(cli::run_streaming(path, &args, progress))
 }
 
 pub fn push(path: &str, force: bool, progress: impl FnMut(&str)) -> Result<()> {

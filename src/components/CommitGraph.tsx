@@ -6,8 +6,8 @@ import { commitMenu, dropBranchMenu } from "../actions";
 import RefsPopover from "./RefsPopover";
 import { RefIcons, refWhere } from "./RefIcons";
 import { useAvatar, useDateFormat } from "../hooks";
-import { GlobalKey } from "../settings";
-import { shortSha, useG, useRepo, useStore } from "../store";
+import { GLOBAL_DEFAULTS, GlobalKey } from "../settings";
+import { g, shortSha, useG, useRepo, useStore } from "../store";
 import { Avatar, avatarColor, initials, laneColor } from "./ui";
 
 const ROW_H = 30;
@@ -50,13 +50,12 @@ function angularPath(s: Seg) {
   return `${down} ${turnDown}`;
 }
 
-/** Commit node: the author's avatar (or initials) in a ring of the lane color. */
-function Node({ row, trunks }: { row: GraphRow; trunks: number }) {
+/** Commit node: the author's avatar (or initials) in a ring of the lane color, centred at `cx`. */
+function Node({ row, trunks, cx }: { row: GraphRow; trunks: number; cx: number }) {
   const url = useAvatar(row.email);
   const [broken, setBroken] = useState(false);
   const c = laneColor(row.color, trunks);
   const isTrunk = row.color < trunks;
-  const cx = x(row.lane);
   if (row.parents.length > 1) {
     // Merges stay small dots, so real work stands out.
     return <circle cx={cx} cy={MID} r={isTrunk ? 5 : 4.5} fill={c} stroke="var(--bg)" strokeWidth={1.5} />;
@@ -105,23 +104,39 @@ function Lanes({ row, width, trunks }: { row: GraphRow; width: number; trunks: n
           fill="none"
         />
       ))}
-      <Node row={row} trunks={trunks} />
+      <Node row={row} trunks={trunks} cx={x(row.lane)} />
     </svg>
   );
 }
 
-function Pills({ row, width, trunks }: { row: GraphRow; width: number; trunks: number }) {
+/**
+ * Compact graph, for a column narrower than the full graph: every commit on
+ * one line at the column centre, linked to the commits above and below.
+ */
+function CompactLane({ row, width, trunks, linkUp }: { row: GraphRow; width: number; trunks: number; linkUp: boolean }) {
+  const cx = width / 2;
+  const color = laneColor(row.color, trunks);
+  return (
+    <svg width={width} height={ROW_H} className="lanes">
+      {linkUp && <path d={`M${cx} 0 V${MID}`} stroke={color} strokeWidth={2} />}
+      {row.parents.length > 0 && <path d={`M${cx} ${MID} V${ROW_H}`} stroke={color} strokeWidth={2} />}
+      <Node row={row} trunks={trunks} cx={cx} />
+    </svg>
+  );
+}
+
+function Pills({ row, trunks }: { row: GraphRow; trunks: number }) {
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const close = useCallback(() => setAnchor(null), []);
   if (!row.refs.length) return null;
   const color = laneColor(row.color, trunks);
-  // Branches first, tags last. Tags are labels only: never switchable and
-  // never listed in the "+N" switcher.
+  // One label per row, whatever the column width: the first branch (the
+  // backend lists the current one first), else the first tag. The other
+  // branches sit behind "+N"; tags are labels only, never switch targets.
   const branches = row.refs.filter((r) => r.kind !== "tag");
   const tags = row.refs.filter((r) => r.kind === "tag");
-  const max = Math.max(1, Math.floor((width - 40) / 120));
-  const shown = [...branches, ...tags].slice(0, max);
-  const hiddenBranches = branches.length - shown.filter((r) => r.kind !== "tag").length;
+  const shown = [branches[0] ?? tags[0]];
+  const hiddenBranches = Math.max(0, branches.length - 1);
   const hiddenTags = tags.filter((t) => !shown.includes(t));
   return (
     <>
@@ -185,14 +200,58 @@ function Pills({ row, width, trunks }: { row: GraphRow; width: number; trunks: n
     </>
   );
 }
-const COLS: { key: GlobalKey; label: string; width?: string }[] = [
-  { key: "colRefs", label: "Branch / Tag", width: "refs" },
-  { key: "colGraph", label: "Graph" },
-  { key: "colMessage", label: "Commit message" },
-  { key: "colAuthor", label: "Author", width: "author" },
-  { key: "colDate", label: "Date / Time", width: "date" },
-  { key: "colSha", label: "SHA", width: "sha" },
+type ColumnId = "refs" | "graph" | "message" | "author" | "date" | "sha";
+
+interface Column {
+  id: ColumnId;
+  /** Setting that shows or hides the column. */
+  visible: GlobalKey;
+  label: string;
+  /** Narrowest width a drag can reach. */
+  min: number;
+}
+
+/** Narrowest graph column: one avatar with the HEAD ring. */
+const GRAPH_MIN = 28;
+
+const COLUMNS: Column[] = [
+  { id: "refs", visible: "colRefs", label: "Branch / Tag", min: 90 },
+  { id: "graph", visible: "colGraph", label: "Graph", min: GRAPH_MIN },
+  { id: "message", visible: "colMessage", label: "Commit message", min: 120 },
+  { id: "author", visible: "colAuthor", label: "Author", min: 60 },
+  { id: "date", visible: "colDate", label: "Date / Time", min: 70 },
+  { id: "sha", visible: "colSha", label: "SHA", min: 64 },
 ];
+
+/**
+ * Column widths (Preferences), resized by dragging a header edge and reset
+ * by double-clicking it. The graph column fits the whole graph until the
+ * user sizes it.
+ */
+function useColumnWidths(graphFit: number) {
+  const stored = useG("colWidths");
+  const { setG } = useStore.getState();
+  const widthOf = (id: ColumnId) => stored[id] ?? (id === "graph" ? graphFit : GLOBAL_DEFAULTS.colWidths[id]);
+  const resize = (col: Column, startX: number) => {
+    const start = widthOf(col.id);
+    const move = (e: PointerEvent) => setG("colWidths", { ...g("colWidths"), [col.id]: Math.max(col.min, Math.round(start + e.clientX - startX)) });
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  const reset = (id: ColumnId) => {
+    const next = { ...g("colWidths") };
+    delete next[id];
+    setG("colWidths", next);
+  };
+  return { widthOf, resize, reset };
+}
+
+/** Right padding of every row and of the header (`.row`, `.graph-head`). */
+const ROW_PAD = 10;
 
 export default function CommitGraph() {
   const { data } = useRepo();
@@ -212,7 +271,6 @@ export default function CommitGraph() {
     colDate: useG("colDate"),
     colSha: useG("colSha"),
   } as Record<string, boolean>;
-  const widths = useG("colWidths");
   const descMode = useG("showDescription");
   const visibility = useG("branchVisibility");
   const hoverHl = useG("hoverHighlight");
@@ -241,7 +299,13 @@ export default function CommitGraph() {
 
   const offset = hasWip ? 1 : 0;
   const total = rows.length + offset;
-  const graphW = Math.max(1, graph?.width ?? 1) * LANE_W + 6;
+  const graphFit = Math.max(1, graph?.width ?? 1) * LANE_W + 6;
+  const { widthOf, resize, reset } = useColumnWidths(graphFit);
+  const columns = COLUMNS.filter((c) => show[c.visible]);
+  const rowW = columns.reduce((sum, c) => sum + widthOf(c.id), ROW_PAD);
+  const graphW = widthOf("graph");
+  const compact = graphW < graphFit;
+  const head = useRef<HTMLDivElement>(null);
 
   const matches = useMemo(() => {
     if (!search) return null;
@@ -288,38 +352,26 @@ export default function CommitGraph() {
     if (nearEnd) void loadMore();
   }, [nearEnd, loadMore]);
 
-  const w = (k: string) => widths[k] ?? 120;
-  const resize = (k: string, startX: number) => {
-    const start = w(k);
-    const move = (e: PointerEvent) => setG("colWidths", { ...useStore.getState().settings.global.colWidths as Record<string, number>, ...{ [k]: Math.max(50, start + e.clientX - startX) } });
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-  };
-
   const colMenu = (e: React.MouseEvent) =>
-    openMenu(e, COLS.map((c) => ({ label: `${show[c.key] ? "✓ " : "   "}${c.label}`, action: () => setG(c.key, !show[c.key] as never) })));
+    openMenu(e, COLUMNS.map((c) => ({ label: `${show[c.visible] ? "✓ " : "   "}${c.label}`, action: () => setG(c.visible, !show[c.visible] as never) })));
 
   const items = [];
   for (let i = first; i < last; i++) {
     if (hasWip && i === 0) {
       const sel = selection?.kind === "wip";
-      const lane = headRow?.lane ?? 0;
+      const cx = compact ? graphW / 2 : x(headRow?.lane ?? 0);
       items.push(
-        <div key="wip" className={`row wip${sel ? " selected" : ""}`} style={{ top: 0 }} onClick={() => select({ kind: "wip" })}>
-          {show.colRefs && <div className="col refs-col" style={{ width: w("refs") }} />}
+        <div key="wip" className={`row wip${sel ? " selected" : ""}`} style={{ top: 0, width: rowW }} onClick={() => select({ kind: "wip" })}>
+          {show.colRefs && <div className="col refs-col" style={{ width: widthOf("refs") }} />}
           {show.colGraph && (
-            <div className="col" style={{ padding: 0 }}>
+            <div className="col" style={{ width: graphW, padding: 0 }}>
               <svg width={graphW} height={ROW_H} className="lanes">
-                {headRow && <path d={`M${x(lane)} ${MID} L${x(lane)} ${ROW_H}`} stroke="var(--muted)" strokeDasharray="3 3" strokeWidth={2} />}
-                <circle cx={x(lane)} cy={MID} r={8} fill="var(--bg)" stroke="var(--muted)" strokeDasharray="3 2" strokeWidth={2} />
+                {headRow && <path d={`M${cx} ${MID} L${cx} ${ROW_H}`} stroke="var(--muted)" strokeDasharray="3 3" strokeWidth={2} />}
+                <circle cx={cx} cy={MID} r={8} fill="var(--bg)" stroke="var(--muted)" strokeDasharray="3 2" strokeWidth={2} />
               </svg>
             </div>
           )}
-          <div className="col msg-col">
+          <div className="col msg-col" style={{ width: widthOf("message") }}>
             <em className="wip-label">// WIP</em>
             <span className="chip accent">+{wipCount}</span>
           </div>
@@ -335,7 +387,7 @@ export default function CommitGraph() {
       <div
         key={row.oid}
         className={`row${sel ? " selected" : ""}${dim ? " dim" : ""}${tip ? " hl-tip" : ""}${row.isHead ? " head" : ""}`}
-        style={{ top: i * ROW_H, ...(tip ? { "--branch": laneColor(row.color, graph?.trunks ?? 0) } : {}) } as React.CSSProperties}
+        style={{ top: i * ROW_H, width: rowW, ...(tip ? { "--branch": laneColor(row.color, graph?.trunks ?? 0) } : {}) } as React.CSSProperties}
         onClick={() => select({ kind: "commit", oid: row.oid })}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -348,30 +400,33 @@ export default function CommitGraph() {
         }}
       >
         {show.colRefs && (
-          <div className="col refs-col" style={{ width: w("refs") }}>
-            <Pills row={row} width={w("refs")} trunks={graph?.trunks ?? 0} />
+          <div className="col refs-col" style={{ width: widthOf("refs") }}>
+            <Pills row={row} trunks={graph?.trunks ?? 0} />
           </div>
         )}
         {show.colGraph && (
-          <div className="col" style={{ padding: 0 }}>
-            <Lanes row={row} width={graphW} trunks={graph?.trunks ?? 0} />
+          <div className="col" style={{ width: graphW, padding: 0 }}>
+            {compact ? (
+              <CompactLane row={row} width={graphW} trunks={graph?.trunks ?? 0} linkUp={i > 0} />
+            ) : (
+              <Lanes row={row} width={graphFit} trunks={graph?.trunks ?? 0} />
+            )}
           </div>
         )}
         {show.colMessage && (
-          <div className="col msg-col">
+          <div className="col msg-col" style={{ width: widthOf("message") }}>
             <span className="msg-sum">{row.summary}</span>
             {descMode !== "never" && row.body && <span className={`msg-desc${descMode === "hover" ? " hover-only" : ""}`}>{row.body}</span>}
           </div>
         )}
-        {!show.colMessage && <div className="spacer" />}
         {show.colAuthor && (
-          <div className="col author-col" style={{ width: w("author") }}>
+          <div className="col author-col" style={{ width: widthOf("author") }}>
             <Avatar name={row.author} email={row.email} />
             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{row.author}</span>
           </div>
         )}
-        {show.colDate && <div className="col date-col" style={{ width: w("date") }}>{fmt(row.time)}</div>}
-        {show.colSha && <div className="col sha-col mono" style={{ width: w("sha") }}>{shortSha(row.oid)}</div>}
+        {show.colDate && <div className="col date-col" style={{ width: widthOf("date") }}>{fmt(row.time)}</div>}
+        {show.colSha && <div className="col sha-col mono" style={{ width: widthOf("sha") }}>{shortSha(row.oid)}</div>}
       </div>,
     );
   }
@@ -379,24 +434,20 @@ export default function CommitGraph() {
   return (
     <div className="graph-wrap">
       <div className="graph-head" onContextMenu={(e) => (e.preventDefault(), colMenu(e))}>
-        {show.colRefs && (
-          <div className="col" style={{ width: w("refs") }}>
-            Branch / Tag<span className="col-resize" onPointerDown={(e) => resize("refs", e.clientX)} />
-          </div>
-        )}
-        {show.colGraph && <div className="col" style={{ width: graphW }}>Graph</div>}
-        {show.colMessage ? <div className="col" style={{ flex: 1, minWidth: 120 }}>Commit message</div> : <div className="spacer" />}
-        {show.colAuthor && (
-          <div className="col" style={{ width: w("author") }}>
-            Author<span className="col-resize" onPointerDown={(e) => resize("author", e.clientX)} />
-          </div>
-        )}
-        {show.colDate && (
-          <div className="col" style={{ width: w("date") }}>
-            Date / Time<span className="col-resize" onPointerDown={(e) => resize("date", e.clientX)} />
-          </div>
-        )}
-        {show.colSha && <div className="col" style={{ width: w("sha") }}>SHA</div>}
+        {/* Scrolled with the body (see onScroll); the Columns button stays put. */}
+        <div className="graph-head-track" ref={head}>
+          {columns.map((c) => (
+            <div key={c.id} className="col" style={{ width: widthOf(c.id) }}>
+              {c.label}
+              <span
+                className="col-resize"
+                title="Drag to resize · double-click to reset"
+                onPointerDown={(e) => resize(c, e.clientX)}
+                onDoubleClick={() => reset(c.id)}
+              />
+            </div>
+          ))}
+        </div>
         <button className="icon" title="Columns" onClick={colMenu}>
           <Settings2 size={13} />
         </button>
@@ -404,11 +455,16 @@ export default function CommitGraph() {
       <div
         className="graph"
         ref={scroller}
-        onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+        onScroll={(e) => {
+          setScrollTop(e.currentTarget.scrollTop);
+          if (head.current) head.current.scrollLeft = e.currentTarget.scrollLeft;
+        }}
         // Hover/tip highlights paint from the message column onwards.
-        style={{ "--row-start": `${(show.colRefs ? w("refs") : 0) + (show.colGraph ? graphW : 0)}px` } as React.CSSProperties}
+        style={{ "--row-start": `${(show.colRefs ? widthOf("refs") : 0) + (show.colGraph ? graphW : 0)}px` } as React.CSSProperties}
       >
-        <div style={{ height: total * ROW_H, position: "relative" }}>{items}</div>
+        <div className="graph-rows" style={{ height: total * ROW_H, width: rowW }}>
+          {items}
+        </div>
         {!graph && (
           <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
             {Array.from({ length: 10 }, (_, i) => <div key={i} className="skeleton" style={{ width: `${40 + ((i * 37) % 50)}%` }} />)}

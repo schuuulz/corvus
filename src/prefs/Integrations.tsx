@@ -15,6 +15,13 @@ const PROVIDERS: Provider[] = [
   { kind: "gitlab-self", name: "GitLab Self-Managed", selfHosted: true, tokenUrl: (h) => `https://${h}/-/user_settings/personal_access_tokens?name=Corvus&scopes=api,read_user,write_repository`, scopes: "api, read_user, write_repository", icon: <Server size={15} /> },
 ];
 
+/**
+ * The bare domain of a self-hosted server, however it was typed or pasted:
+ * "https://gitlab.acme.com/some/page" → "gitlab.acme.com".
+ */
+const normalizeHost = (input: string) =>
+  input.trim().replace(/^https?:\/\//i, "").split("/")[0].toLowerCase();
+
 function SshBlock({ i, provider }: { i: Integration; provider: Provider }) {
   const pub = useG("sshPublicKey");
   const { toast, setG } = useStore.getState();
@@ -84,7 +91,7 @@ function ProviderPage({ provider }: { provider: Provider }) {
   const connect = async () => {
     setBusy(true);
     try {
-      const h = provider.selfHosted ? host.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "") : provider.kind === "github" ? "github.com" : "gitlab.com";
+      const h = provider.selfHosted ? normalizeHost(host) : provider.kind === "github" ? "github.com" : "gitlab.com";
       const acc = await ext.connect(provider.kind, h, token.trim());
       const id = `${provider.kind}|${h}`;
       const entry: Integration = { id, kind: provider.kind, host: h, username: acc.username, name: acc.name, avatar: acc.avatar };
@@ -106,7 +113,7 @@ function ProviderPage({ provider }: { provider: Provider }) {
     await setG("integrations", integrations.filter((x) => x.id !== i.id));
   };
 
-  const tokenHost = provider.selfHosted ? host || "your-host" : "";
+  const tokenHost = provider.selfHosted ? normalizeHost(host) : "";
   return (
     <div className="grow">
       <h1 style={{ fontSize: 20, margin: "0 0 6px", display: "flex", gap: 8, alignItems: "center" }}>{provider.icon} {provider.name}</h1>
@@ -149,7 +156,7 @@ function ProviderPage({ provider }: { provider: Provider }) {
             help={
               <>
                 Needs scopes: <code>{provider.scopes}</code>. Stored in your system keychain.{" "}
-                {(!provider.selfHosted || host) && (
+                {(!provider.selfHosted || tokenHost) && (
                   <span className="link-text" onClick={() => openExternal(provider.tokenUrl(tokenHost))}>
                     Create a token <ExternalLink size={11} />
                   </span>
@@ -161,7 +168,7 @@ function ProviderPage({ provider }: { provider: Provider }) {
           </Setting>
           <Setting label="">
             <div className="row-inline">
-              <button className="success" disabled={busy || !token.trim() || (provider.selfHosted && !host.trim())} onClick={connect}>
+              <button className="success" disabled={busy || !token.trim() || (provider.selfHosted && !normalizeHost(host))} onClick={connect}>
                 {busy ? "Connecting…" : `Connect to ${provider.name}`}
               </button>
               {editing && <button onClick={() => setEditing(null)}>Cancel</button>}

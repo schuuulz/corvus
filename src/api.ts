@@ -125,7 +125,8 @@ export const api = {
   setConfig: (repo: string | null, key: string, value: string) => call<void>("set_config", { repo, key, value }),
 };
 
-export type PullMode = "ff-only" | "merge" | "rebase";
+/** Mirrors `git::ops::PullMode`: "ff" fast-forwards when possible and merges otherwise. */
+export type PullMode = "ff" | "ff-only" | "rebase";
 
 export type IntegrationKind = "github" | "github-enterprise" | "gitlab" | "gitlab-self";
 export interface Integration { id: string; kind: IntegrationKind; host: string; username: string; name: string; avatar: string }
