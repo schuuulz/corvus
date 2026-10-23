@@ -215,8 +215,8 @@ pub async fn fetch(app: AppHandle, repo: String) -> Result<OpOutcome> {
 }
 
 #[tauri::command]
-pub async fn pull(app: AppHandle, repo: String, mode: String) -> Result<OpOutcome> {
-    outcome::pull(&repo, &mode, progress(&app, &repo))
+pub async fn pull(app: AppHandle, repo: String, mode: ops::PullMode) -> Result<OpOutcome> {
+    outcome::pull(&repo, mode, progress(&app, &repo))
 }
 
 #[tauri::command]

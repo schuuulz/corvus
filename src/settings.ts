@@ -20,7 +20,7 @@ export const GLOBAL_DEFAULTS = {
   gitPath: "",
   extendedLog: false,
   conflictDetection: true,
-  pullMode: "ff-only" as PullMode,
+  pullMode: "ff" as PullMode,
   // ui
   language: "system" as "system" | "en" | "pt-BR",
   theme: "corvus-dark" as Theme,

@@ -118,7 +118,7 @@ pub fn checkout(path: &str, target: &str, remote: bool) -> Result<OpOutcome> {
     Ok(o)
 }
 
-pub fn pull(path: &str, mode: &str, progress: impl FnMut(&str)) -> Result<OpOutcome> {
+pub fn pull(path: &str, mode: ops::PullMode, progress: impl FnMut(&str)) -> Result<OpOutcome> {
     let repo = super::open(path)?;
     let before = head_oid(&repo);
     let branch = head_label(&repo);
