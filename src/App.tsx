@@ -4,6 +4,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import { api, ext } from "./api";
 import * as A from "./actions";
+import { useBrowserChromeGuard } from "./browserChrome";
 import { useNarrow, useRepoIntegrationSync } from "./hooks";
 import { g, NEW_TAB, useG, useRepo, useStore } from "./store";
 import CommitGraph from "./components/CommitGraph";
@@ -264,6 +265,7 @@ export default function App() {
   const labels = useG("toolbarLabels");
   const modal = useStore((s) => s.modal);
   useShortcuts();
+  useBrowserChromeGuard();
   useBackendConfig();
   useAutoFetch();
   useGraphPrefs();
