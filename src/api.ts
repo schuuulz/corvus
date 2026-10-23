@@ -174,6 +174,7 @@ export const ext = {
   termWrite: (id: number, data: string) => call<void>("term_write", { id, data }),
   termResize: (id: number, cols: number, rows: number) => call<void>("term_resize", { id, cols, rows }),
   termKill: (id: number) => call<void>("term_kill", { id }),
+  termPromptBranch: (repo: string, branch: string, color: string) => call<void>("term_prompt_branch", { repo, branch, color }),
   gitflow: (repo: string) => call<Gitflow>("gitflow_get", { repo }),
   gitflowInit: (repo: string, g: Omit<Gitflow, "initialized">) => call<void>("gitflow_init", { repo, ...g }),
   gitflowStart: (repo: string, kind: string, name: string) => call<void>("gitflow_start", { repo, kind, name }),

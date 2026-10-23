@@ -4,6 +4,7 @@
 use crate::git::{self, cli, ext, Error, Result};
 use crate::integrations::{self as integ, Kind};
 use crate::settings::Settings;
+use crate::shell_prompt;
 use crate::system;
 use crate::terminal::{self, Terminals};
 use serde::Deserialize;
@@ -152,6 +153,12 @@ pub async fn open_merge_tool(repo: String, file: String, tool: Option<String>) -
 #[tauri::command]
 pub async fn term_shells() -> Result<Vec<terminal::Shell>> {
     Ok(terminal::shells())
+}
+
+/// Records the HEAD branch of `repo` and its graph colour for terminal prompts.
+#[tauri::command]
+pub async fn term_prompt_branch(app: AppHandle, repo: String, branch: String, color: String) -> Result<()> {
+    shell_prompt::write_head(&shell_prompt::dir(&app)?, &repo, &branch, &color)
 }
 
 #[tauri::command]

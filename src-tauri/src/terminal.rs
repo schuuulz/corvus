@@ -1,6 +1,7 @@
 //! In-app terminal sessions backed by a pseudo-terminal. Output is streamed
 //! to the UI as `term-data` events; input and resizes come back as commands.
 
+use crate::shell_prompt;
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -73,6 +74,13 @@ pub fn spawn(app: AppHandle, state: &Terminals, id: u32, cwd: &str, shell: &str,
     }
     cmd.cwd(cwd);
     cmd.env("TERM", "xterm-256color");
+    // The branch in the prompt is cosmetic: without its scripts the
+    // terminal still opens, with the shell's usual prompt.
+    if let Ok(dir) = shell_prompt::dir(&app) {
+        if shell_prompt::install(&dir).is_ok() {
+            shell_prompt::configure(&mut cmd, shell, &program, &dir, &shell_prompt::head_file(&dir, cwd));
+        }
+    }
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
