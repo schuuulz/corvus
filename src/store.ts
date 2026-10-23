@@ -20,7 +20,16 @@ export type CenterView =
   | { kind: "history"; file: string }
   | { kind: "blame"; file: string };
 
-export interface MenuItem { label: string; action?: () => void; danger?: boolean; disabled?: boolean; icon?: import("react").ReactNode }
+export interface MenuItem {
+  /** Plain text of the item, also used to match items. */
+  label: string;
+  /** Rich rendering of `label` (e.g. highlighted branch names). */
+  content?: import("react").ReactNode;
+  action?: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+  icon?: import("react").ReactNode;
+}
 export type MenuEntry = MenuItem | "sep";
 
 export interface Field { name: string; label: string; value?: string; type?: "text" | "textarea" | "checkbox" | "select"; options?: string[]; placeholder?: string }

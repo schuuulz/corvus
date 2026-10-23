@@ -43,7 +43,8 @@ export function ContextMenu() {
             }}
           >
             {it.icon}
-            {it.label}
+            {/* One flex item, so rich labels keep their own spacing. */}
+            <span>{it.content ?? it.label}</span>
           </div>
         ),
       )}

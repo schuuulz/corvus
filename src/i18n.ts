@@ -1,6 +1,7 @@
 // Minimal i18n: feedback messages in English and Brazilian Portuguese.
 // `t(key, vars)` interpolates `{name}` placeholders.
 
+import { createElement, Fragment, ReactNode } from "react";
 import { useStore } from "./store";
 
 export type Lang = "en" | "pt-BR";
@@ -256,8 +257,20 @@ export function resolveLang(setting: string): Lang {
   return navigator.language.toLowerCase().startsWith("pt") ? "pt-BR" : "en";
 }
 
-export function t(key: MsgKey, vars: Record<string, string | number | null | undefined> = {}): string {
+/** The message for `key` in the UI language, placeholders untouched. */
+function template(key: MsgKey): string {
   const setting = (useStore.getState().settings.global.language as string | undefined) ?? "system";
-  const s = DICTS[resolveLang(setting)][key] ?? en[key] ?? key;
-  return s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+  return DICTS[resolveLang(setting)][key] ?? en[key] ?? key;
+}
+
+export function t(key: MsgKey, vars: Record<string, string | number | null | undefined> = {}): string {
+  return template(key).replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+}
+
+/** Like `t`, but placeholders take React nodes, kept where each language puts them. */
+export function tNodes(key: MsgKey, vars: Record<string, ReactNode>): ReactNode[] {
+  // split() with a capture group alternates text and placeholder names.
+  return template(key)
+    .split(/\{(\w+)\}/)
+    .map((part, i) => (i % 2 ? createElement(Fragment, { key: i }, vars[part]) : part));
 }

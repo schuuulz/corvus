@@ -10,7 +10,7 @@ import { createElement } from "react";
 import { Cloud, GitPullRequest } from "lucide-react";
 import { api, ext, Gitflow, GraphRow, LocalBranch, NewPullRequest, OpOutcome, RefLabel, RemoteBranch } from "./api";
 import { fb } from "./feedback";
-import { t } from "./i18n";
+import { t, tNodes } from "./i18n";
 import { g, gitMessage, MenuEntry, NEW_TAB, r, RepoIntegration, shortSha, useStore } from "./store";
 
 const S = () => useStore.getState();
@@ -413,6 +413,9 @@ export async function createPullRequest(host: RepoIntegration, pr: NewPullReques
   return true;
 }
 
+/** A branch name set apart inside a menu label. */
+const refChip = (name: string) => createElement("span", { className: "menu-ref" }, name);
+
 /** "Merge <current> into <target>…" per target on the hosted repo; none without permission. */
 function pullRequestItems(targets: string[]): MenuEntry[] {
   const source = head();
@@ -424,6 +427,7 @@ function pullRequestItems(targets: string[]): MenuEntry[] {
     .map((target) => ({
       icon: createElement(GitPullRequest, { size: 13 }),
       label: t("pr.menu", { source, target }),
+      content: tNodes("pr.menu", { source: refChip(source), target: refChip(target) }),
       action: () => openPullRequest(source, target),
     }));
 }
