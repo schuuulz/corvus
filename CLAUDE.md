@@ -102,6 +102,7 @@ Examples: `feat(graph): one-click branch switch from the +N menu`, `fix(staging)
   - Windows: msi/exe
   - Linux: deb/rpm/AppImage
   - macOS: dmg, arm64 and x64
+- Every release also gets `latest.json` (the in-app updater's manifest) and `SHA256SUMS.txt`. Installer and updater signing is described in `docs/SIGNING.md`. The updater key's private half lives only in repository secrets: never commit it.
 
 ## CI/CD
 

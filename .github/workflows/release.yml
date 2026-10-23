@@ -3,9 +3,12 @@
 # On every push to main, release-please keeps a "release x.y.z" PR up to date
 # (version bump in package.json, tauri.conf.json, Cargo.toml/Cargo.lock and
 # CHANGELOG.md, derived from Conventional Commits). Merging that PR tags
-# vX.Y.Z and creates the GitHub Release; the build job then attaches the
-# installers for Windows, Linux and macOS to it, and the sync-dev job merges
-# main back into dev so dev also carries the release commit.
+# vX.Y.Z and creates the GitHub Release. Then:
+# - build attaches the installers for Windows, Linux and macOS, signed when
+#   signing is configured (docs/SIGNING.md), plus the in-app updater bundles;
+# - release-manifests writes latest.json (the updater's manifest) and
+#   SHA256SUMS.txt once every installer is attached;
+# - sync-dev merges main back into dev so dev also carries the release commit.
 #
 # The build runs in this same workflow because tags created with
 # GITHUB_TOKEN do not trigger other workflows.
@@ -56,10 +59,18 @@ jobs:
           - name: macos-arm64
             platform: macos-latest
             args: "--target aarch64-apple-darwin"
+            mac_arch: aarch64
           - name: macos-x64
             platform: macos-latest
             args: "--target x86_64-apple-darwin"
+            mac_arch: x64
     runs-on: ${{ matrix.platform }}
+    env:
+      TAG: ${{ needs.release-please.outputs.tag_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Windows installers go through SignPath once it is configured
+      # (docs/SIGNING.md); until then they are attached unsigned.
+      SIGN_WINDOWS: ${{ matrix.name == 'windows-x64' && vars.SIGNPATH_ORGANIZATION_ID != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -87,15 +98,90 @@ jobs:
 
       - run: npm ci
 
-      - uses: tauri-apps/tauri-action@v0
+      # Exported only when set: Tauri treats an empty APPLE_CERTIFICATE as a
+      # certificate and fails, so without the secrets the app stays unsigned.
+      - name: Apple signing credentials
+        if: startsWith(matrix.platform, 'macos')
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -n "${!name}" ]; then
+              { echo "$name<<APPLE_EOF"; echo "${!name}"; echo "APPLE_EOF"; } >> "$GITHUB_ENV"
+            fi
+          done
+
+      # Builds only: the installers are attached below, once signed if needed.
+      - uses: tauri-apps/tauri-action@v0
+        id: tauri
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ needs.release-please.outputs.tag_name }}
-          releaseName: Corvus ${{ needs.release-please.outputs.tag_name }}
-          releaseDraft: false
-          prerelease: false
-          args: ${{ matrix.args }}
+          # Adds the signed update bundles the in-app updater downloads.
+          args: ${{ matrix.args }} --config src-tauri/tauri.release.conf.json
+
+      - name: Collect installers
+        shell: bash
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+        run: node .github/scripts/collect-installers.mjs "$ARTIFACT_PATHS" dist "${{ matrix.mac_arch }}"
+
+      - name: Upload unsigned Windows installers
+        if: env.SIGN_WINDOWS == 'true'
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-unsigned
+          path: |
+            dist/*.msi
+            dist/*-setup.exe
+
+      - name: Sign Windows installers (SignPath)
+        if: env.SIGN_WINDOWS == 'true'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      # Authenticode changes the files, so the updater signature of the
+      # NSIS installer is made again from the signed one.
+      - name: Use the signed Windows installers
+        if: env.SIGN_WINDOWS == 'true'
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          cp signed/* dist/
+          for installer in dist/*-setup.exe; do
+            npx tauri signer sign "$installer"
+          done
+
+      - name: Attach installers to the release
+        shell: bash
+        run: gh release upload "$TAG" dist/* --clobber
+
+  release-manifests:
+    needs: [release-please, build]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update manifest and checksums
+        run: .github/scripts/release-manifests.sh "${{ needs.release-please.outputs.tag_name }}" "${{ needs.release-please.outputs.version }}"
 
   sync-dev:
     needs: release-please

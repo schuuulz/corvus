@@ -150,6 +150,13 @@ pub async fn open_merge_tool(repo: String, file: String, tool: Option<String>) -
 
 // --- in-app terminal ---------------------------------------------------------
 
+/// Whether this installation can update itself. On Linux only AppImages can:
+/// deb and rpm installs belong to the system package manager.
+#[tauri::command]
+pub fn updater_supported() -> bool {
+    !cfg!(target_os = "linux") || std::env::var_os("APPIMAGE").is_some()
+}
+
 #[tauri::command]
 pub async fn term_shells() -> Result<Vec<terminal::Shell>> {
     Ok(terminal::shells())
