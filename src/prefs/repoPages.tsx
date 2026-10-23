@@ -36,8 +36,8 @@ export function CommitPrefs() {
     const text = b.trim() ? `${s}\n\n${b}\n` : `${s}\n`;
     try {
       const gitDir = `${repo}/.git`;
-      await ext.writeRepoFile(repo, ".git/kc-commit-template", text);
-      await ext.configSet(repo, "commit.template", s || b ? `${gitDir}/kc-commit-template` : "");
+      await ext.writeRepoFile(repo, ".git/corvus-commit-template", text);
+      await ext.configSet(repo, "commit.template", s || b ? `${gitDir}/corvus-commit-template` : "");
       useSaved.getState().flash();
     } catch (e) {
       toast(String(e), "error");
@@ -232,7 +232,7 @@ export function ConflictPrevention() {
         {...R}
         multiline
         label="Base branches"
-        help="One pattern per line. kraken-craft guesses which branch yours started from among these and predicts which files would conflict when merging it."
+        help="One pattern per line. Corvus guesses which branch yours started from among these and predicts which files would conflict when merging it."
       />
       <div className="pattern-table" style={{ marginLeft: "min(284px, 30%)" }}>
         <code>origin/main</code><i>include a single branch (main) on origin</i>

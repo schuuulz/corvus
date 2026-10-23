@@ -6,13 +6,13 @@ import { loader } from "@monaco-editor/react";
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 loader.config({ monaco });
 
-monaco.editor.defineTheme("kc-dark", {
+monaco.editor.defineTheme("corvus-dark", {
   base: "vs-dark",
   inherit: true,
   rules: [],
-  colors: { "editor.background": "#151821", "diffEditor.insertedTextBackground": "#2ea04333", "diffEditor.removedTextBackground": "#f8514933" },
+  colors: { "editor.background": "#0f1418", "diffEditor.insertedTextBackground": "#2ea04333", "diffEditor.removedTextBackground": "#f8514933" },
 });
-monaco.editor.defineTheme("kc-light", { base: "vs", inherit: true, rules: [], colors: {} });
+monaco.editor.defineTheme("corvus-light", { base: "vs", inherit: true, rules: [], colors: {} });
 
 const EXT: Record<string, string> = {
   ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript", mjs: "javascript", json: "json",

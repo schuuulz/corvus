@@ -1,6 +1,6 @@
 //! End-to-end tests of the git backend against throwaway repositories.
 
-use kraken_craft_lib::git::{self, commit, conflict, ext, graph, ops, outcome::{self, OpStatus}, refs, status};
+use corvus_lib::git::{self, commit, conflict, ext, graph, ops, outcome::{self, OpStatus}, refs, status};
 use std::fs;
 use std::process::Command;
 
@@ -267,11 +267,11 @@ fn graph_pins_trunks_and_gives_features_own_lanes() {
     // The merge line joins an existing line to A1 rather than adding its own.
     assert!(converging >= 2, "a2 and a3 converge into A1 ({converging})");
 }
-/// Prints the layout of a real repository: `KC_REPO=path cargo test -- --ignored dump_graph --nocapture`.
+/// Prints the layout of a real repository: `CORVUS_REPO=path cargo test -- --ignored dump_graph --nocapture`.
 #[test]
 #[ignore]
 fn dump_graph() {
-    let path = std::env::var("KC_REPO").expect("set KC_REPO");
+    let path = std::env::var("CORVUS_REPO").expect("set CORVUS_REPO");
     let trunks: Vec<String> = ["main", "master", "develop", "dev"].iter().map(|s| s.to_string()).collect();
     let g = graph::build(&git::open(&path).unwrap(), 200, &trunks).unwrap();
     for r in &g.rows {

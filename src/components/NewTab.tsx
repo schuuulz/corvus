@@ -12,7 +12,7 @@ export default function NewTab() {
       <div className="newtab-inner">
         <div>
           <h1>
-            <Logo size={40} /> kraken-craft
+            <Logo size={40} /> Corvus
           </h1>
           <p className="muted">Open, clone or create a repository to get started.</p>
           <div className="big-actions">

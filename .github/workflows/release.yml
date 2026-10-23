@@ -91,7 +91,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ needs.release-please.outputs.tag_name }}
-          releaseName: kraken-craft ${{ needs.release-please.outputs.tag_name }}
+          releaseName: Corvus ${{ needs.release-please.outputs.tag_name }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

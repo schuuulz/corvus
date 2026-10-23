@@ -34,7 +34,7 @@ export function General() {
       <h2>Repositories</h2>
       <GitText gitKey="init.defaultBranch" label="Default branch name" placeholder="main" help="Sets the default branch name when initialising new repositories." />
       <Toggle k="deleteOrig" label={'Delete ".orig" files after merging'} />
-      <Toggle k="rememberTabs" label="Remember tabs" help="Reopen the repositories that were open when you last closed kraken-craft." />
+      <Toggle k="rememberTabs" label="Remember tabs" help="Reopen the repositories that were open when you last closed Corvus." />
       <h2>Graph</h2>
       <Toggle k="showAllCommits" label="Show all commits in graph" warn="Enabling this option may affect performance on very large repositories." />
       <NumberInput k="initialCommits" label="Initial commits in graph" min={500} max={100000} step={500} help="Minimum 500. With lazy loading on, more commits load as you scroll to the end of the graph." />
@@ -111,7 +111,7 @@ export function UiCustomization() {
   );
 }
 
-const MONO_FONTS = ["Cascadia Code", "Cascadia Mono", "Consolas", "JetBrains Mono", "Fira Code", "Source Code Pro", "Hack", "IBM Plex Mono", "Roboto Mono", "Ubuntu Mono", "Courier New", "Lucida Console"];
+const MONO_FONTS = ["Geist Mono", "Cascadia Code", "Cascadia Mono", "Consolas", "JetBrains Mono", "Fira Code", "Source Code Pro", "Hack", "IBM Plex Mono", "Roboto Mono", "Ubuntu Mono", "Courier New", "Lucida Console"];
 const PROP_FONTS = ["Segoe UI", "Arial", "Calibri", "Inter", "Verdana", "Georgia"];
 
 function FontSelect({ k, monoKey, label, help }: { k: "editorFont" | "termFont"; monoKey?: "editorMonoOnly"; label: string; help?: string }) {
@@ -141,7 +141,7 @@ export function EditorPrefs() {
       <FontSelect k="editorFont" monoKey="editorMonoOnly" label="Font" />
       <NumberInput k="editorFontSize" label="Font size" min={8} max={32} />
       <NumberInput k="editorTabSize" label="Tab size" min={1} max={16} />
-      <Select k="editorEol" label="End of line character" help="Used when saving files edited in kraken-craft." options={[["auto", "Keep as is"], ["LF", "LF"], ["CRLF", "CRLF"]]} />
+      <Select k="editorEol" label="End of line character" help="Used when saving files edited in Corvus." options={[["auto", "Keep as is"], ["LF", "LF"], ["CRLF", "CRLF"]]} />
       <Toggle k="editorSyntax" label="Syntax highlighting" />
       <Toggle k="editorLineNumbers" label="Show line numbers" />
       <Toggle k="editorWordWrap" label="Word wrap" />
@@ -169,7 +169,7 @@ export function TerminalPrefs() {
 export function Notifications() {
   return (
     <Page title="Notifications" icon={<Bell size={20} />}>
-      <Toggle k="desktopNotifications" label="Enable desktop notifications" help="Notify when long operations finish (pull, push, clone) or auto-fetch brings in new commits while kraken-craft is in the background." />
+      <Toggle k="desktopNotifications" label="Enable desktop notifications" help="Notify when long operations finish (pull, push, clone) or auto-fetch brings in new commits while Corvus is in the background." />
     </Page>
   );
 }
@@ -203,10 +203,10 @@ export function Ssh() {
   const generate = async () => {
     const v = await ask({
       title: "Generate SSH key",
-      message: "Creates an ed25519 key pair and configures kraken-craft to use it.",
+      message: "Creates an ed25519 key pair and configures Corvus to use it.",
       fields: [
-        { name: "path", label: "Private key path", placeholder: "~/.ssh/kraken_craft_ed25519 (default)" },
-        { name: "comment", label: "Comment", value: (await ext.configGet(null, "user.email").catch(() => "")) || "kraken-craft" },
+        { name: "path", label: "Private key path", placeholder: "~/.ssh/corvus_ed25519 (default)" },
+        { name: "comment", label: "Comment", value: (await ext.configGet(null, "user.email").catch(() => "")) || "Corvus" },
         { name: "pass", label: "Passphrase (optional)" },
       ],
       confirmLabel: "Generate",
@@ -245,7 +245,7 @@ export function Ssh() {
           />
         </>
       )}
-      <Setting label="Generate new key pair" help="Creates new keys and configures kraken-craft to use them.">
+      <Setting label="Generate new key pair" help="Creates new keys and configures Corvus to use them.">
         <div><button className="success" onClick={generate}><KeyRound size={14} /> Generate</button></div>
       </Setting>
       <h2>HTTPS</h2>
