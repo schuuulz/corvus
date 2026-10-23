@@ -250,8 +250,13 @@ pub async fn integration_issues(kind: Kind, host: String, repo: String) -> Resul
 }
 
 #[tauri::command]
-pub async fn integration_create_pr(kind: Kind, host: String, repo: String, source: String, target: String, title: String, body: String) -> Result<String> {
-    integ::create_pull_request(kind, &host, &repo, &source, &target, &title, &body).await
+pub async fn integration_repo_access(kind: Kind, host: String, repo: String) -> Result<integ::RepoAccess> {
+    integ::repo_access(kind, &host, &repo).await
+}
+
+#[tauri::command]
+pub async fn integration_create_pr(kind: Kind, host: String, repo: String, pr: integ::NewPullRequest) -> Result<integ::PullRequest> {
+    integ::create_pull_request(kind, &host, &repo, &pr).await
 }
 
 #[tauri::command]

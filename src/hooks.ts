@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { ext, Integration, IntegrationKind, Issue, PullRequest, RemoteRef } from "./api";
+import { ext, Integration, IntegrationKind, Issue, PullRequest, Remote } from "./api";
 import { formatDate, fromNow } from "./format";
-import { g, useG, useRepo, useStore } from "./store";
+import { g, RepoIntegration, useG, useRepo, useStore } from "./store";
 
 export type DateKind = "date" | "word" | "datetime" | "verbose";
 
@@ -22,52 +22,65 @@ export function useDateFormat() {
 /** Hosts a provider kind serves by default. */
 const HOSTS: Partial<Record<IntegrationKind, string>> = { github: "github.com", gitlab: "gitlab.com" };
 
-export interface RepoIntegration {
-  integration: Integration;
-  remote: RemoteRef;
+type Hosting = Omit<RepoIntegration, "access">;
+
+/** The connected integration serving one of `remotes`: origin first, the repo's issue tracker preferred. */
+async function findHosting(remotes: Remote[], integrations: Integration[], tracker: string): Promise<Hosting | null> {
+  const ordered = [...remotes].sort((a, b) => (a.name === "origin" ? -1 : b.name === "origin" ? 1 : 0));
+  for (const rm of ordered) {
+    if (!rm.url) continue;
+    const parsed = await ext.parseRemote(rm.url).catch(() => null);
+    if (!parsed) continue;
+    const candidates = integrations.filter((i) => (HOSTS[i.kind] ?? i.host).toLowerCase() === parsed.host);
+    const pick = candidates.find((i) => i.id === tracker) ?? candidates[0];
+    if (pick) return { integration: pick, remote: parsed, remoteName: rm.name };
+  }
+  return null;
 }
 
-/** Finds the connected integration serving the active repo's remotes. */
-export function useRepoIntegration(): RepoIntegration | null {
+/**
+ * Keeps the active repo's hosted repository, and what the account may do
+ * there, in the store, where components and menus both read it.
+ */
+export function useRepoIntegrationSync() {
   const { repo, data } = useRepo();
   const integrations = useG("integrations");
   const tracker = useStore((s) => (repo ? (s.settings.repos[repo]?.issueTracker as string | undefined) : undefined)) || g("defaultIssueTracker");
   const remotes = data?.refs?.remotes;
-  const [found, setFound] = useState<RepoIntegration | null>(null);
-  const key = JSON.stringify([remotes?.map((r) => r.url), integrations.map((i) => i.id), tracker]);
+  const key = JSON.stringify([repo, remotes?.map((r) => [r.name, r.url]), integrations.map((i) => i.id), tracker]);
 
   useEffect(() => {
+    if (!repo) return;
     let live = true;
+    const publish = (ri: RepoIntegration | null) => {
+      if (live) useStore.setState((s) => ({ repoIntegration: { ...s.repoIntegration, [repo]: ri } }));
+    };
     (async () => {
-      if (!remotes?.length || !integrations.length) return setFound(null);
-      const ordered = [...remotes].sort((a, b) => (a.name === "origin" ? -1 : b.name === "origin" ? 1 : 0));
-      for (const rm of ordered) {
-        if (!rm.url) continue;
-        const parsed = await ext.parseRemote(rm.url).catch(() => null);
-        if (!parsed) continue;
-        const candidates = integrations.filter((i) => (HOSTS[i.kind] ?? i.host).toLowerCase() === parsed.host);
-        const pick = candidates.find((i) => i.id === tracker) ?? candidates[0];
-        if (pick) {
-          if (live) setFound({ integration: pick, remote: parsed });
-          return;
-        }
-      }
-      if (live) setFound(null);
+      const hosting = remotes?.length && integrations.length ? await findHosting(remotes, integrations, tracker) : null;
+      if (!hosting) return publish(null);
+      publish({ ...hosting, access: null });
+      const { integration: i, remote } = hosting;
+      // Unreachable or unknown access counts as none: PR actions stay hidden.
+      const access = await ext.repoAccess(i.kind, i.host, remote.path).catch(() => null);
+      publish({ ...hosting, access });
     })();
     return () => {
       live = false;
     };
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
-  return found;
 }
 
-interface Remote<T> { items: T[] | null; error: string | null; reload: () => void }
+/** The connected integration serving the active repo, if any. */
+export const useRepoIntegration = () => useStore((s) => (s.active ? s.repoIntegration[s.active] ?? null : null));
 
-function useRemoteList<T>(ri: RepoIntegration | null, load: (ri: RepoIntegration) => Promise<T[]>): Remote<T> {
+interface RemoteList<T> { items: T[] | null; error: string | null; reload: () => void }
+
+/** `version` reloads the list when it changes (e.g. after creating an item). */
+function useRemoteList<T>(ri: RepoIntegration | null, load: (ri: RepoIntegration) => Promise<T[]>, version = 0): RemoteList<T> {
   const [items, setItems] = useState<T[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
-  const key = ri ? `${ri.integration.id}|${ri.remote.path}|${tick}` : "";
+  const key = ri ? `${ri.integration.id}|${ri.remote.path}|${tick}|${version}` : "";
   useEffect(() => {
     if (!ri) {
       setItems(null);
@@ -83,8 +96,10 @@ function useRemoteList<T>(ri: RepoIntegration | null, load: (ri: RepoIntegration
   return { items, error, reload: () => setTick((t) => t + 1) };
 }
 
-export const usePullRequests = (ri: RepoIntegration | null) =>
-  useRemoteList<PullRequest>(ri, ({ integration: i, remote }) => ext.pulls(i.kind, i.host, remote.path));
+export function usePullRequests(ri: RepoIntegration | null) {
+  const version = useStore((s) => s.pullRequestsVersion);
+  return useRemoteList<PullRequest>(ri, ({ integration: i, remote }) => ext.pulls(i.kind, i.host, remote.path), version);
+}
 
 export const useIssues = (ri: RepoIntegration | null) =>
   useRemoteList<Issue>(ri, ({ integration: i, remote }) => ext.issues(i.kind, i.host, remote.path));

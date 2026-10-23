@@ -28,6 +28,7 @@ All frontend and backend code must be **extremely high quality, elegant, and eas
 - Use `Result` and `?` with meaningful errors (`git::Error`). No `unwrap()` / `expect()` on fallible runtime paths; they are allowed only for true invariants, with the reason stated.
 - Keep modules focused: git reads (`git2`), git writes (`cli`), outcomes, integrations, system.
 - Tauri commands stay thin: validate the input, call the domain function, return typed data.
+- Never enable Tauri's `devtools` feature: release builds must not expose the web inspector.
 - Every behaviour change comes with a test (unit tests in the module, and integration tests in `tests/git_ops.rs` using throwaway repos).
 - Keep `cargo test` clean and the build free of compiler warnings.
 

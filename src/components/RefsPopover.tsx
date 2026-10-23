@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Check, Cloud, GitBranch, Loader2, Search, Tag, X } from "lucide-react";
 import { RefLabel } from "../api";
 import * as A from "../actions";
-import { MenuEntry, useRepo, useStore } from "../store";
+import { useStore } from "../store";
 import { RefIcons, refWhere } from "./RefIcons";
 
 interface Props {
@@ -21,7 +21,6 @@ const GROUPS: { kind: RefLabel["kind"][]; label: string }[] = [
 
 /** Dropdown with every branch on a commit; one click switches to it. */
 export default function RefsPopover({ refs, color, anchor, onClose }: Props) {
-  const { data } = useRepo();
   const { openMenu } = useStore.getState();
   const root = useRef<HTMLDivElement>(null);
   const [q, setQ] = useState("");
@@ -72,19 +71,9 @@ export default function RefsPopover({ refs, color, anchor, onClose }: Props) {
     else setFailed(r.name);
   };
 
-  // A grouped label is one branch in several places: offer the local
-  // branch menu, then the remote-only actions for each remote copy.
   const menu = (e: React.MouseEvent, r: RefLabel) => {
     e.preventDefault();
-    const refs = data?.refs;
-    const local = r.kind === "local" ? refs?.locals.find((b) => b.name === r.name) : undefined;
-    const remoteNames = r.kind === "local" ? r.remotes.map((name) => `${name}/${r.name}`) : [r.name];
-    const remotes = remoteNames.flatMap((n) => refs?.remoteBranches.filter((b) => b.name === n) ?? []);
-    const items: MenuEntry[] = local ? A.localBranchMenu(local) : [];
-    for (const rb of remotes) {
-      const own = A.remoteBranchMenu(rb).filter((x) => x !== "sep" && (!local || !x.label.startsWith("Checkout")));
-      items.push("sep", { label: rb.name, disabled: true, icon: <Cloud size={12} /> }, ...own);
-    }
+    const items = A.refLabelMenu(r);
     if (!items.length) items.push({ label: `Checkout ${r.name}`, action: () => pick(r) }, { label: "Copy name", action: () => navigator.clipboard.writeText(r.name) });
     openMenu(e, items);
   };

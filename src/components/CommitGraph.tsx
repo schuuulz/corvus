@@ -142,6 +142,12 @@ function Pills({ row, width, trunks }: { row: GraphRow; width: number; trunks: n
               e.stopPropagation();
               if (!r.current) void A.checkout(r.name, r.kind === "remote");
             }}
+            onContextMenu={(e) => {
+              // This branch's own menu, not the commit menu of the row.
+              e.preventDefault();
+              e.stopPropagation();
+              useStore.getState().openMenu(e, A.refLabelMenu(r));
+            }}
             title={`${r.name} · ${refWhere(r)}\nLast commit by ${row.author}${r.current ? "\nCurrent branch" : "\nDouble-click to switch"}`}
           >
             {/* The label sits on the branch tip, so this is its latest author. */}

@@ -155,6 +155,36 @@ pub struct PullRequest {
     pub updated: String,
 }
 
+fn github_pr(p: &Value) -> PullRequest {
+    PullRequest {
+        number: p["number"].as_u64().unwrap_or(0),
+        title: s(p, "title"),
+        url: s(p, "html_url"),
+        author: s(&p["user"], "login"),
+        source: s(&p["head"], "ref"),
+        target: s(&p["base"], "ref"),
+        draft: p["draft"].as_bool().unwrap_or(false),
+        updated: s(p, "updated_at"),
+    }
+}
+
+fn gitlab_pr(p: &Value) -> PullRequest {
+    PullRequest {
+        number: p["iid"].as_u64().unwrap_or(0),
+        title: s(p, "title"),
+        url: s(p, "web_url"),
+        author: s(&p["author"], "username"),
+        source: s(p, "source_branch"),
+        target: s(p, "target_branch"),
+        draft: p["draft"].as_bool().unwrap_or(false),
+        updated: s(p, "updated_at"),
+    }
+}
+
+fn to_pr(kind: Kind) -> fn(&Value) -> PullRequest {
+    if kind.is_github() { github_pr } else { gitlab_pr }
+}
+
 pub async fn pull_requests(kind: Kind, host: &str, repo: &str) -> Result<Vec<PullRequest>> {
     let c = Client::new(kind, &default_host(kind, host), None)?;
     let list = if kind.is_github() {
@@ -162,38 +192,44 @@ pub async fn pull_requests(kind: Kind, host: &str, repo: &str) -> Result<Vec<Pul
     } else {
         c.get(&format!("/projects/{}/merge_requests?state=opened&per_page=50", project(repo))).await?
     };
-    Ok(list
-        .as_array()
-        .map(|a| {
-            a.iter()
-                .map(|p| {
-                    if kind.is_github() {
-                        PullRequest {
-                            number: p["number"].as_u64().unwrap_or(0),
-                            title: s(p, "title"),
-                            url: s(p, "html_url"),
-                            author: s(&p["user"], "login"),
-                            source: s(&p["head"], "ref"),
-                            target: s(&p["base"], "ref"),
-                            draft: p["draft"].as_bool().unwrap_or(false),
-                            updated: s(p, "updated_at"),
-                        }
-                    } else {
-                        PullRequest {
-                            number: p["iid"].as_u64().unwrap_or(0),
-                            title: s(p, "title"),
-                            url: s(p, "web_url"),
-                            author: s(&p["author"], "username"),
-                            source: s(p, "source_branch"),
-                            target: s(p, "target_branch"),
-                            draft: p["draft"].as_bool().unwrap_or(false),
-                            updated: s(p, "updated_at"),
-                        }
-                    }
-                })
-                .collect()
-        })
-        .unwrap_or_default())
+    Ok(list.as_array().map(|a| a.iter().map(to_pr(kind)).collect()).unwrap_or_default())
+}
+
+/// What the connected account may do on a hosted repository.
+#[derive(Serialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RepoAccess {
+    /// Can push branches, and therefore open pull requests from them.
+    pub can_push: bool,
+    pub default_branch: String,
+}
+
+/// GitLab's Developer role: the lowest one allowed to push branches.
+const GITLAB_DEVELOPER: u64 = 30;
+
+fn github_access(repo: &Value) -> RepoAccess {
+    RepoAccess {
+        can_push: repo["permissions"]["push"].as_bool().unwrap_or(false),
+        default_branch: s(repo, "default_branch"),
+    }
+}
+
+/// The effective level is the higher of the project and the group membership.
+fn gitlab_access(project: &Value) -> RepoAccess {
+    let level = |scope: &str| project["permissions"][scope]["access_level"].as_u64().unwrap_or(0);
+    RepoAccess {
+        can_push: level("project_access").max(level("group_access")) >= GITLAB_DEVELOPER,
+        default_branch: s(project, "default_branch"),
+    }
+}
+
+pub async fn repo_access(kind: Kind, host: &str, repo: &str) -> Result<RepoAccess> {
+    let c = Client::new(kind, &default_host(kind, host), None)?;
+    if kind.is_github() {
+        Ok(github_access(&c.get(&format!("/repos/{repo}")).await?))
+    } else {
+        Ok(gitlab_access(&c.get(&format!("/projects/{}", project(repo))).await?))
+    }
 }
 
 #[derive(Serialize)]
@@ -234,18 +270,37 @@ pub async fn issues(kind: Kind, host: &str, repo: &str) -> Result<Vec<Issue>> {
         .unwrap_or_default())
 }
 
-pub async fn create_pull_request(kind: Kind, host: &str, repo: &str, source: &str, target: &str, title: &str, body: &str) -> Result<String> {
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewPullRequest {
+    pub source: String,
+    pub target: String,
+    pub title: String,
+    pub body: String,
+    pub draft: bool,
+}
+
+/// GitLab has no draft flag on creation: a "Draft:" title prefix marks it.
+fn gitlab_title(pr: &NewPullRequest) -> String {
+    if pr.draft && !pr.title.starts_with("Draft:") { format!("Draft: {}", pr.title) } else { pr.title.clone() }
+}
+
+pub async fn create_pull_request(kind: Kind, host: &str, repo: &str, pr: &NewPullRequest) -> Result<PullRequest> {
     let c = Client::new(kind, &default_host(kind, host), None)?;
-    let r = if kind.is_github() {
-        c.post(&format!("/repos/{repo}/pulls"), json!({ "title": title, "head": source, "base": target, "body": body })).await?
+    let created = if kind.is_github() {
+        c.post(
+            &format!("/repos/{repo}/pulls"),
+            json!({ "title": pr.title, "head": pr.source, "base": pr.target, "body": pr.body, "draft": pr.draft }),
+        )
+        .await?
     } else {
         c.post(
             &format!("/projects/{}/merge_requests", project(repo)),
-            json!({ "title": title, "source_branch": source, "target_branch": target, "description": body }),
+            json!({ "title": gitlab_title(pr), "source_branch": pr.source, "target_branch": pr.target, "description": pr.body }),
         )
         .await?
     };
-    Ok(s(&r, if kind.is_github() { "html_url" } else { "web_url" }))
+    Ok(to_pr(kind)(&created))
 }
 
 pub async fn add_ssh_key(kind: Kind, host: &str, title: &str, public_key: &str) -> Result<()> {
@@ -295,5 +350,51 @@ mod tests {
             Some(RemoteRef { host: "gitlab.example.com".into(), path: "group/sub/proj".into() })
         );
         assert_eq!(parse_remote("/local/path"), None);
+    }
+
+    #[test]
+    fn reads_github_push_permission() {
+        let repo = json!({ "default_branch": "main", "permissions": { "admin": false, "push": true, "pull": true } });
+        assert_eq!(github_access(&repo), RepoAccess { can_push: true, default_branch: "main".into() });
+        let read_only = json!({ "default_branch": "main", "permissions": { "push": false, "pull": true } });
+        assert!(!github_access(&read_only).can_push);
+        // Repos the account isn't a member of come back without permissions.
+        assert!(!github_access(&json!({ "default_branch": "main" })).can_push);
+    }
+
+    #[test]
+    fn reads_gitlab_access_level() {
+        let access = |project: Value, group: Value| {
+            gitlab_access(&json!({ "default_branch": "dev", "permissions": { "project_access": project, "group_access": group } }))
+        };
+        assert_eq!(access(json!({ "access_level": 30 }), Value::Null), RepoAccess { can_push: true, default_branch: "dev".into() });
+        assert!(access(Value::Null, json!({ "access_level": 40 })).can_push, "group membership grants access");
+        assert!(!access(json!({ "access_level": 20 }), Value::Null).can_push, "a Reporter cannot push");
+        assert!(!access(Value::Null, Value::Null).can_push);
+    }
+
+    #[test]
+    fn maps_pull_requests_from_both_providers() {
+        let github = github_pr(&json!({
+            "number": 7, "title": "Login", "html_url": "https://github.com/o/r/pull/7", "user": { "login": "ana" },
+            "head": { "ref": "feat/login" }, "base": { "ref": "dev" }, "draft": true, "updated_at": "2026-10-23T10:00:00Z"
+        }));
+        let gitlab = gitlab_pr(&json!({
+            "iid": 7, "title": "Login", "web_url": "https://gitlab.com/o/r/-/merge_requests/7", "author": { "username": "ana" },
+            "source_branch": "feat/login", "target_branch": "dev", "draft": true, "updated_at": "2026-10-23T10:00:00Z"
+        }));
+        for pr in [&github, &gitlab] {
+            assert_eq!((pr.number, pr.source.as_str(), pr.target.as_str(), pr.author.as_str(), pr.draft), (7, "feat/login", "dev", "ana", true));
+        }
+        assert!(github.url.ends_with("/pull/7"));
+        assert!(gitlab.url.ends_with("/merge_requests/7"));
+    }
+
+    #[test]
+    fn marks_gitlab_drafts_in_the_title() {
+        let pr = |title: &str, draft: bool| NewPullRequest { source: "a".into(), target: "b".into(), title: title.into(), body: String::new(), draft };
+        assert_eq!(gitlab_title(&pr("Login", true)), "Draft: Login");
+        assert_eq!(gitlab_title(&pr("Draft: Login", true)), "Draft: Login");
+        assert_eq!(gitlab_title(&pr("Login", false)), "Login");
     }
 }

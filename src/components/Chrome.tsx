@@ -200,7 +200,7 @@ export function Toolbar() {
                     await A.push(true);
                 },
               },
-              ...(head ? [{ label: "Create pull request…", action: () => set({ modal: { kind: "pr" as const, branch: head } }) }] : []),
+              ...(head && A.pullRequestHost() ? [{ label: "Create pull request…", action: () => A.openPullRequest(head) }] : []),
             ])
           }
         >

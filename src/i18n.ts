@@ -1,6 +1,7 @@
 // Minimal i18n: feedback messages in English and Brazilian Portuguese.
 // `t(key, vars)` interpolates `{name}` placeholders.
 
+import { createElement, Fragment, ReactNode } from "react";
 import { useStore } from "./store";
 
 export type Lang = "en" | "pt-BR";
@@ -109,7 +110,22 @@ const en = {
   "gitflow.missing.desc": "Check the repository: names must match its branches exactly ({names})",
   "gitflow.fieldMissing": "No branch with this exact name in this repository",
   "clone.title": "Repository cloned",
+  "pr.menu": "Merge {source} into {target}",
+  "pr.dialog.title": "Create pull request",
+  "pr.dialog.into": "Merge {source} into",
+  "pr.dialog.titleField": "Title",
+  "pr.dialog.description": "Description",
+  "pr.dialog.draft": "Create as draft",
+  "pr.dialog.push": "{branch} will be pushed to {remote} first",
+  "pr.dialog.exists": "#{number} already merges {source} into {target}",
+  "pr.dialog.open": "Open #{number}",
+  "pr.dialog.noTargets": "{remote} has no other branch to merge into",
+  "pr.dialog.cancel": "Cancel",
+  "pr.dialog.create": "Create pull request",
+  "pr.dialog.creating": "Creating…",
+  "pr.loading": "Creating pull request",
   "pr.created": "Pull request created",
+  "pr.failed": "Could not create the pull request",
   "nothing.undo": "Nothing to undo",
   "nothing.redo": "Nothing to redo",
   "details": "details",
@@ -212,7 +228,22 @@ const ptBR: Record<keyof typeof en, string> = {
   "gitflow.missing.desc": "Verifique o repositório: os nomes devem ser exatamente iguais aos das branches ({names})",
   "gitflow.fieldMissing": "Não existe branch com esse nome exato neste repositório",
   "clone.title": "Repositório clonado",
+  "pr.menu": "Merge de {source} em {target}",
+  "pr.dialog.title": "Criar pull request",
+  "pr.dialog.into": "Merge de {source} em",
+  "pr.dialog.titleField": "Título",
+  "pr.dialog.description": "Descrição",
+  "pr.dialog.draft": "Criar como rascunho",
+  "pr.dialog.push": "{branch} será enviada para {remote} antes",
+  "pr.dialog.exists": "#{number} já faz o merge de {source} em {target}",
+  "pr.dialog.open": "Abrir #{number}",
+  "pr.dialog.noTargets": "{remote} não tem outra branch para receber o merge",
+  "pr.dialog.cancel": "Cancelar",
+  "pr.dialog.create": "Criar pull request",
+  "pr.dialog.creating": "Criando…",
+  "pr.loading": "Criando pull request",
   "pr.created": "Pull request criado",
+  "pr.failed": "Não foi possível criar o pull request",
   "nothing.undo": "Nada para desfazer",
   "nothing.redo": "Nada para refazer",
   "details": "detalhes",
@@ -226,8 +257,20 @@ export function resolveLang(setting: string): Lang {
   return navigator.language.toLowerCase().startsWith("pt") ? "pt-BR" : "en";
 }
 
-export function t(key: MsgKey, vars: Record<string, string | number | null | undefined> = {}): string {
+/** The message for `key` in the UI language, placeholders untouched. */
+function template(key: MsgKey): string {
   const setting = (useStore.getState().settings.global.language as string | undefined) ?? "system";
-  const s = DICTS[resolveLang(setting)][key] ?? en[key] ?? key;
-  return s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+  return DICTS[resolveLang(setting)][key] ?? en[key] ?? key;
+}
+
+export function t(key: MsgKey, vars: Record<string, string | number | null | undefined> = {}): string {
+  return template(key).replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+}
+
+/** Like `t`, but placeholders take React nodes, kept where each language puts them. */
+export function tNodes(key: MsgKey, vars: Record<string, ReactNode>): ReactNode[] {
+  // split() with a capture group alternates text and placeholder names.
+  return template(key)
+    .split(/\{(\w+)\}/)
+    .map((part, i) => (i % 2 ? createElement(Fragment, { key: i }, vars[part]) : part));
 }
