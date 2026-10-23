@@ -34,7 +34,7 @@ function Session({ id, cwd, visible }: { id: number; cwd: string; visible: boole
       cursorStyle: cursor,
       cursorBlink: true,
       allowProposedApi: true,
-      theme: { background: readVar("--bg-2"), foreground: readVar("--text"), cursor: readVar("--accent-2"), selectionBackground: "#7c5cff55" },
+      theme: { background: readVar("--bg-2"), foreground: readVar("--text"), cursor: readVar("--accent-2"), selectionBackground: readVar("--sel") },
     });
     const f = new FitAddon();
     t.loadAddon(f);
@@ -77,7 +77,7 @@ function Session({ id, cwd, visible }: { id: number; cwd: string; visible: boole
     t.options.fontSize = size;
     t.options.lineHeight = lineHeight;
     t.options.cursorStyle = cursor;
-    t.options.theme = { background: readVar("--bg-2"), foreground: readVar("--text"), cursor: readVar("--accent-2"), selectionBackground: "#7c5cff55" };
+    t.options.theme = { background: readVar("--bg-2"), foreground: readVar("--text"), cursor: readVar("--accent-2"), selectionBackground: readVar("--sel") };
     fit.current?.fit();
   }, [font, size, lineHeight, cursor, theme]);
 

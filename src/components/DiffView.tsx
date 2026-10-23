@@ -30,7 +30,7 @@ export function useEditorOptions() {
 
 export function useEditorTheme() {
   const theme = useG("theme");
-  return theme === "kraken-light" ? "kc-light" : "kc-dark";
+  return theme === "corvus-light" ? "corvus-light" : "corvus-dark";
 }
 
 function HunkBlock({ h, index, file, mode }: { h: Hunk; index: number; file: string; mode: DiffMode }) {

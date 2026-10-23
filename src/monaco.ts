@@ -10,7 +10,7 @@ monaco.editor.defineTheme("corvus-dark", {
   base: "vs-dark",
   inherit: true,
   rules: [],
-  colors: { "editor.background": "#151821", "diffEditor.insertedTextBackground": "#2ea04333", "diffEditor.removedTextBackground": "#f8514933" },
+  colors: { "editor.background": "#0f1418", "diffEditor.insertedTextBackground": "#2ea04333", "diffEditor.removedTextBackground": "#f8514933" },
 });
 monaco.editor.defineTheme("corvus-light", { base: "vs", inherit: true, rules: [], colors: {} });
 

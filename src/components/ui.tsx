@@ -2,11 +2,11 @@ import { ReactNode, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Folder } from "lucide-react";
 import { useAvatar } from "../hooks";
 
-export const PALETTE = ["#7c5cff", "#21d4b4", "#f06292", "#4fc3f7", "#ffb74d", "#aed581", "#ba68c8", "#e57373", "#4db6ac", "#9575cd", "#fff176", "#a1887f"];
+export const PALETTE = ["#10b981", "#7c5cff", "#f06292", "#4fc3f7", "#ffb74d", "#aed581", "#ba68c8", "#e57373", "#4db6ac", "#9575cd", "#fff176", "#a1887f"];
 /** Main branches (trunk columns) share one color across the graph. */
-export const TRUNK_COLOR = "#5841D8";
+export const TRUNK_COLOR = "#10b981";
 /** Colors cycled by every other branch line. */
-export const BRANCH_COLORS = ["#3EBB8A", "#F5A623", "#E54B4B", "#0090FF", "#5841D8", "#00A6C9"];
+export const BRANCH_COLORS = ["#8B5CF6", "#F5A623", "#E54B4B", "#0090FF", "#5841D8", "#00A6C9"];
 
 /**
  * Color of a graph line/label. The backend numbers trunk colors 0..trunks
