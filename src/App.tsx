@@ -5,6 +5,7 @@ import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import { api, ext } from "./api";
 import * as A from "./actions";
 import { useBrowserChromeGuard } from "./browserChrome";
+import { playUpdateDemo, updateOnLaunch } from "./updater";
 import { useNarrow, useRepoIntegrationSync } from "./hooks";
 import { g, NEW_TAB, useG, useRepo, useStore } from "./store";
 import CommitGraph from "./components/CommitGraph";
@@ -22,6 +23,7 @@ import { ActivityLog, Banner, StatusBar, TabBar, Toolbar } from "./components/Ch
 import { CloneDialog, CommandPalette, Shortcuts } from "./components/Modals";
 import CreatePullRequest from "./components/CreatePullRequest";
 import { ContextMenu, Dialog, Toasts } from "./components/Overlays";
+import UpdateOverlay from "./components/UpdateOverlay";
 import { Splitter } from "./components/ui";
 import PreferencesView from "./prefs/PreferencesView";
 import "./App.css";
@@ -244,6 +246,16 @@ function useGraphPrefs() {
   }, [pin, trunks]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
+/** Installs a newer release, if any, once the app is up. */
+function useUpdateOnLaunch() {
+  const ready = useStore((s) => s.ready);
+  useEffect(() => {
+    if (!ready) return;
+    if (import.meta.env.DEV && import.meta.env.VITE_UPDATE_DEMO) playUpdateDemo();
+    else void updateOnLaunch();
+  }, [ready]);
+}
+
 function useAutoFetch() {
   const minutes = useG("autoFetchMinutes");
   const active = useStore((s) => s.active);
@@ -269,6 +281,7 @@ export default function App() {
   useBackendConfig();
   useAutoFetch();
   useGraphPrefs();
+  useUpdateOnLaunch();
   useRepoIntegrationSync();
 
   useEffect(() => {
@@ -316,6 +329,7 @@ export default function App() {
       <Dialog />
       <ContextMenu />
       <Toasts />
+      <UpdateOverlay />
     </div>
   );
 }

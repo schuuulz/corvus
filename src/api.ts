@@ -169,6 +169,7 @@ export const ext = {
   openInEditor: (toolPath: string, target: string) => call<void>("open_in_editor", { toolPath, target }),
   openTerminal: (toolId: string, toolPath: string, dir: string) => call<void>("open_terminal", { toolId, toolPath, dir }),
   openMergeTool: (repo: string, file: string, tool: string | null) => call<void>("open_merge_tool", { repo, file, tool }),
+  updaterSupported: () => call<boolean>("updater_supported"),
   termShells: () => call<Shell[]>("term_shells"),
   termSpawn: (id: number, cwd: string, shell: string, cols: number, rows: number) => call<void>("term_spawn", { id, cwd, shell, cols, rows }),
   termWrite: (id: number, data: string) => call<void>("term_write", { id, data }),
