@@ -69,6 +69,13 @@ type Modal =
   | { kind: "rebase"; base: string | null }
   | { kind: "pr"; branch: string; base?: string };
 
+/** Progress of the update installed on launch (see `updater.ts`). */
+export type UpdateState =
+  | { phase: "downloading"; version: string; done: number; total: number | null }
+  | { phase: "installing"; version: string }
+  | { phase: "relaunching"; version: string }
+  | { phase: "failed"; version: string; message: string };
+
 /** The hosted repository behind a local one, reached through a connected integration. */
 export interface RepoIntegration {
   integration: Integration;
@@ -116,6 +123,8 @@ interface State {
   repoIntegration: Record<string, RepoIntegration | null>;
   /** Bumped when a pull request is opened, so open PR lists reload. */
   pullRequestsVersion: number;
+  /** The update being installed, if any. */
+  update: UpdateState | null;
 
   init(): Promise<void>;
   setG<K extends GlobalKey>(key: K, value: GlobalSettings[K]): Promise<void>;
@@ -211,6 +220,7 @@ export const useStore = create<State>((set, get) => ({
   gitflowPanel: null,
   repoIntegration: {},
   pullRequestsVersion: 0,
+  update: null,
 
   async loadGitflow(path) {
     const repo = path ?? get().active;

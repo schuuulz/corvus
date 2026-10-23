@@ -33,5 +33,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/schuuulz/corvus/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdGMjdGRjU5MUU4QjEzNTUKUldSVkU0c2VXZjhuZjM0Nko5WGs4NVZ3VUk2RXYwVmZDVjd1eEpLcllSWjZZaVBEM2hoaGNEUzQK",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

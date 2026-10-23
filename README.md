@@ -19,7 +19,7 @@ Corvus is a graphical Git client built with **Tauri 2**, **Rust** and **React**.
   - interactive rebase (reorder, squash, fixup, reword, drop);
   - undo and redo.
 - **Conflicts:** a 3-way merge editor, plus an external merge tool if you prefer one.
-- **Remotes:** fetch, pull (ff-only, merge or rebase), push or force-push with lease, and auto-fetch.
+- **Remotes:** fetch, pull (fast-forward if possible, fast-forward only or rebase), push or force-push with lease, and auto-fetch.
 - **Gitflow:** start and finish feature, release and hotfix branches from the main branches in the side panel.
 - **Integrations:** GitHub, GitHub Enterprise, GitLab and GitLab Self-Managed through personal access tokens stored in your OS keychain, with pull requests, issues and SSH key upload.
 - **Tooling:**
@@ -45,9 +45,26 @@ Get the latest installer from **[Releases](../../releases/latest)**:
 | Linux | `.deb`, `.rpm` or `.AppImage` |
 | macOS | `.dmg` (Apple Silicon `aarch64` or Intel `x64`) |
 
-> **Unsigned builds.** The installers are not code-signed yet.
-> - **Windows:** SmartScreen may warn you. Choose *More info › Run anyway*.
-> - **macOS:** right-click the app and choose *Open*, or run `xattr -cr "/Applications/Corvus.app"`.
+Once installed, Corvus keeps itself up to date: on launch it installs any newer release and restarts. On Linux this needs the `.AppImage`; with `.deb` or `.rpm` it tells you a new version is out.
+
+### Installing an unsigned build
+
+Code signing is being set up (see [docs/SIGNING.md](docs/SIGNING.md)). Until then, browsers and operating systems may warn about the installers:
+
+- **Browser download warning:** choose *Keep* (Chrome: *⋯ › Keep*; Edge: *⋯ › Keep › Keep anyway*).
+- **Windows SmartScreen** ("Windows protected your PC"): choose *More info › Run anyway*.
+- **Microsoft Defender flags or removes the file:** this is a false positive on an unsigned build.
+  - To restore the file, go to *Windows Security › Protection history*, then *Actions › Restore*.
+  - Please also report it at [Microsoft's file submission page](https://www.microsoft.com/wdsi/filesubmission) ("Incorrectly detected as malware").
+- **macOS** ("Apple could not verify…"): open the app once, then go to *System Settings › Privacy & Security* and choose *Open Anyway*. Alternatively, run `xattr -cr "/Applications/Corvus.app"`.
+
+To check that a download is intact, compare its hash with `SHA256SUMS.txt` from the same release:
+
+```bash
+sha256sum -c SHA256SUMS.txt --ignore-missing            # Linux
+shasum -a 256 -c SHA256SUMS.txt --ignore-missing        # macOS
+Get-FileHash .\Corvus_*-setup.exe -Algorithm SHA256     # Windows (PowerShell)
+```
 
 ## Development
 
