@@ -416,7 +416,7 @@ export async function createPullRequest(host: RepoIntegration, pr: NewPullReques
 /** A branch name set apart inside a menu label. */
 const refChip = (name: string) => createElement("span", { className: "menu-ref" }, name);
 
-/** "Merge <current> into <target>…" per target on the hosted repo; none without permission. */
+/** "Merge <current> into <target>" per target on the hosted repo; none without permission. */
 function pullRequestItems(targets: string[]): MenuEntry[] {
   const source = head();
   const host = pullRequestHost();
