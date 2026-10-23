@@ -1,6 +1,6 @@
-# kraken-craft: project rules
+# Corvus: project rules
 
-kraken-craft is a desktop Git client built with **Tauri 2 + Rust + React/TypeScript**.
+Corvus is a desktop Git client built with **Tauri 2 + Rust + React/TypeScript**.
 - `src/` holds the UI.
 - `src-tauri/` holds the backend: `git2` for reads, the git CLI for writes and network.
 
@@ -93,10 +93,10 @@ Examples: `feat(graph): one-click branch switch from the +N menu`, `fix(staging)
   - `src-tauri/tauri.conf.json`
   - `src-tauri/Cargo.toml`
   - `src-tauri/Cargo.lock`
-- **Never** create `v*` / `kraken-craft-v*` tags or GitHub Releases manually.
+- **Never** create `v*` / `corvus-v*` tags or GitHub Releases manually.
 - **Never** edit `.release-please-manifest.json` or `release-please-config.json` (unless the task is explicitly about the release setup), nor published entries in `CHANGELOG.md`.
 - To force a version, add a `Release-As: x.y.z` footer to a commit on `main`.
-- Tags are currently named `kraken-craft-vX.Y.Z`.
+- Tags are named `corvus-vX.Y.Z`. Releases up to 0.1.1 were tagged `kraken-craft-vX.Y.Z`, from before the rename.
 - Merging the release PR tags the version. `.github/workflows/release.yml` then builds the installers and attaches them to the GitHub Release:
   - Windows: msi/exe
   - Linux: deb/rpm/AppImage
@@ -112,7 +112,7 @@ Examples: `feat(graph): one-click branch switch from the +N menu`, `fix(staging)
 - It must be green before merging.
 - `release.yml` only runs on pushes to `main`, so don't rename `main`.
 - Install dependencies with `npm ci` and keep `package-lock.json` and `src-tauri/Cargo.lock` committed and in sync.
-- Don't change `identifier` (`com.krakencraft.app`) in `tauri.conf.json`.
+- Don't change `identifier` (`com.corvus.app`) in `tauri.conf.json`.
 - Keep the repository setting "Allow GitHub Actions to create and approve pull requests" enabled. release-please needs it.
 
 ## Secrets

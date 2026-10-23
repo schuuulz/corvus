@@ -72,7 +72,7 @@ impl Client {
             None => system::secret_get(&secret_key(kind, host)).ok_or_else(|| Error::Msg("integration is not connected".into()))?,
         };
         let http = reqwest::Client::builder()
-            .user_agent("kraken-craft")
+            .user_agent("corvus")
             .timeout(std::time::Duration::from_secs(20))
             .build()
             .map_err(err)?;

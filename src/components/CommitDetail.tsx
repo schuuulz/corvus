@@ -36,7 +36,7 @@ export function ViewToggle({ value, onChange }: { value: "path" | "tree"; onChan
 export function useFileView(): ["path" | "tree", (v: "path" | "tree") => void] {
   const [v, setV] = useState<"path" | "tree">(() => {
     try {
-      return (localStorage.getItem("kc.fileView") as "path" | "tree") || "path";
+      return (localStorage.getItem("corvus.fileView") as "path" | "tree") || "path";
     } catch {
       return "path";
     }
@@ -46,7 +46,7 @@ export function useFileView(): ["path" | "tree", (v: "path" | "tree") => void] {
     (n) => {
       setV(n);
       try {
-        localStorage.setItem("kc.fileView", n);
+        localStorage.setItem("corvus.fileView", n);
       } catch {
         /* ignore */
       }

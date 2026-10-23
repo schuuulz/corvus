@@ -129,7 +129,7 @@ export default function RefsPopover({ refs, color, anchor, onClose }: Props) {
                   onClick={() => pick(r)}
                   onContextMenu={(e) => menu(e, r)}
                   draggable={r.kind === "local" || r.kind === "remote"}
-                  onDragStart={(e) => e.dataTransfer.setData("text/kc-branch", r.name)}
+                  onDragStart={(e) => e.dataTransfer.setData("text/corvus-branch", r.name)}
                   title={`${r.name} · ${refWhere(r)}${r.current ? " (current branch)" : r.kind === "remote" ? "\nCreates a local tracking branch" : ""}`}
                 >
                   <span className="refs-pop-icon">

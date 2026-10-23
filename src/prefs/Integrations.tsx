@@ -9,10 +9,10 @@ import { Page, Setting } from "./controls";
 interface Provider { kind: IntegrationKind; name: string; selfHosted: boolean; tokenUrl: (host: string) => string; scopes: string; icon: React.ReactNode }
 
 const PROVIDERS: Provider[] = [
-  { kind: "github", name: "GitHub", selfHosted: false, tokenUrl: () => "https://github.com/settings/tokens/new?scopes=repo,read:user,admin:public_key&description=kraken-craft", scopes: "repo, read:user, admin:public_key", icon: <Globe size={15} /> },
-  { kind: "github-enterprise", name: "GitHub Enterprise Server", selfHosted: true, tokenUrl: (h) => `https://${h}/settings/tokens/new?scopes=repo,read:user,admin:public_key&description=kraken-craft`, scopes: "repo, read:user, admin:public_key", icon: <Server size={15} /> },
-  { kind: "gitlab", name: "GitLab", selfHosted: false, tokenUrl: () => "https://gitlab.com/-/user_settings/personal_access_tokens?name=kraken-craft&scopes=api,read_user,write_repository", scopes: "api, read_user, write_repository", icon: <Globe size={15} /> },
-  { kind: "gitlab-self", name: "GitLab Self-Managed", selfHosted: true, tokenUrl: (h) => `https://${h}/-/user_settings/personal_access_tokens?name=kraken-craft&scopes=api,read_user,write_repository`, scopes: "api, read_user, write_repository", icon: <Server size={15} /> },
+  { kind: "github", name: "GitHub", selfHosted: false, tokenUrl: () => "https://github.com/settings/tokens/new?scopes=repo,read:user,admin:public_key&description=Corvus", scopes: "repo, read:user, admin:public_key", icon: <Globe size={15} /> },
+  { kind: "github-enterprise", name: "GitHub Enterprise Server", selfHosted: true, tokenUrl: (h) => `https://${h}/settings/tokens/new?scopes=repo,read:user,admin:public_key&description=Corvus`, scopes: "repo, read:user, admin:public_key", icon: <Server size={15} /> },
+  { kind: "gitlab", name: "GitLab", selfHosted: false, tokenUrl: () => "https://gitlab.com/-/user_settings/personal_access_tokens?name=Corvus&scopes=api,read_user,write_repository", scopes: "api, read_user, write_repository", icon: <Globe size={15} /> },
+  { kind: "gitlab-self", name: "GitLab Self-Managed", selfHosted: true, tokenUrl: (h) => `https://${h}/-/user_settings/personal_access_tokens?name=Corvus&scopes=api,read_user,write_repository`, scopes: "api, read_user, write_repository", icon: <Server size={15} /> },
 ];
 
 function SshBlock({ i, provider }: { i: Integration; provider: Provider }) {
@@ -23,12 +23,12 @@ function SshBlock({ i, provider }: { i: Integration; provider: Provider }) {
   const generateAndUpload = async () => {
     setBusy(true);
     try {
-      const email = (await ext.configGet(null, "user.email").catch(() => "")) || "kraken-craft";
+      const email = (await ext.configGet(null, "user.email").catch(() => "")) || "Corvus";
       const kp = await ext.sshGenerate(null, email, "");
       await setG("sshPrivateKey", kp.privateKey);
       await setG("sshPublicKey", kp.publicKey);
       await setG("sshUseAgent", false);
-      await ext.addSshKey(i.kind, i.host, title || `kraken-craft ${new Date().toISOString().slice(0, 10)}`, kp.publicKey);
+      await ext.addSshKey(i.kind, i.host, title || `Corvus ${new Date().toISOString().slice(0, 10)}`, kp.publicKey);
       toast(`SSH key generated and added to ${provider.name}`, "success");
     } catch (e) {
       toast(String(e), "error");
@@ -38,7 +38,7 @@ function SshBlock({ i, provider }: { i: Integration; provider: Provider }) {
   };
   const uploadExisting = async () => {
     try {
-      await ext.addSshKey(i.kind, i.host, title || "kraken-craft", pub);
+      await ext.addSshKey(i.kind, i.host, title || "Corvus", pub);
       toast(`Public key added to ${provider.name}`, "success");
     } catch (e) {
       toast(String(e), "error");
@@ -54,7 +54,7 @@ function SshBlock({ i, provider }: { i: Integration; provider: Provider }) {
   return (
     <>
       <h2>SSH key</h2>
-      <Setting label="Current key" help={pub ? pub : "No SSH key configured in kraken-craft. Generate one below or browse for an existing pair."}>
+      <Setting label="Current key" help={pub ? pub : "No SSH key configured in Corvus. Generate one below or browse for an existing pair."}>
         {pub && <div><button className="small" onClick={uploadExisting}>Add this public key to {provider.name}</button></div>}
       </Setting>
       <Setting label="Generate SSH key">

@@ -124,7 +124,7 @@ fn command(cwd: &str) -> Command {
     // Serve integration tokens for their HTTPS hosts. The empty helper resets
     // any configured helpers for that host so ours is the only one asked.
     for (i, (host, user, token)) in cfg.tokens.iter().enumerate() {
-        let var = format!("KC_TOKEN_{i}");
+        let var = format!("CORVUS_TOKEN_{i}");
         c.env(&var, token);
         c.arg("-c").arg(format!("credential.https://{host}.helper="));
         c.arg("-c").arg(format!(

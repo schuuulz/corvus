@@ -4,7 +4,7 @@
 
 import type { Integration, PullMode } from "./api";
 
-export type Theme = "kraken-dark" | "kraken-light" | "midnight" | "contrast";
+export type Theme = "corvus-dark" | "corvus-light" | "midnight" | "contrast";
 export type ToastPos = "bottom-right" | "bottom-left" | "top-right" | "top-left";
 
 export const GLOBAL_DEFAULTS = {
@@ -23,7 +23,7 @@ export const GLOBAL_DEFAULTS = {
   pullMode: "ff-only" as PullMode,
   // ui
   language: "system" as "system" | "en" | "pt-BR",
-  theme: "kraken-dark" as Theme,
+  theme: "corvus-dark" as Theme,
   toastPosition: "bottom-right" as ToastPos,
   toolbarLabels: true,
   dateLocale: "system",
@@ -46,7 +46,7 @@ export const GLOBAL_DEFAULTS = {
   colSha: false,
   showDescription: "always" as "always" | "hover" | "never",
   // editor
-  editorFont: "Cascadia Code",
+  editorFont: "Geist Mono",
   editorMonoOnly: true,
   editorFontSize: 13,
   editorTabSize: 4,
@@ -55,7 +55,7 @@ export const GLOBAL_DEFAULTS = {
   editorLineNumbers: true,
   editorWordWrap: false,
   // terminal
-  termFont: "Cascadia Mono",
+  termFont: "Geist Mono",
   termFontSize: 13,
   termLineHeight: 1.2,
   termCursor: "bar" as "bar" | "block" | "underline",
@@ -107,8 +107,8 @@ export type GlobalKey = keyof GlobalSettings;
 export type RepoKey = keyof RepoSettings;
 
 export const THEMES: { id: Theme; name: string }[] = [
-  { id: "kraken-dark", name: "Kraken Dark" },
-  { id: "kraken-light", name: "Kraken Light" },
+  { id: "corvus-dark", name: "Corvus Dark" },
+  { id: "corvus-light", name: "Corvus Light" },
   { id: "midnight", name: "Midnight" },
   { id: "contrast", name: "High Contrast" },
 ];
