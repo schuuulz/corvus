@@ -1,12 +1,44 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#21d4b4"/></linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#12181d" />
+      <stop offset="1" stop-color="#0b0f12" />
+    </linearGradient>
+    <filter id="glow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="1.6" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
   </defs>
-  <rect x="0" y="0" width="64" height="64" rx="14" fill="#0f1118"/>
-  <circle cx="32" cy="22" r="12" fill="url(#g)"/>
-  <path d="M22 30 C14 40 22 48 14 56" stroke="url(#g)" stroke-width="4" fill="none" stroke-linecap="round"/>
-  <path d="M32 34 L32 58" stroke="url(#g)" stroke-width="4" fill="none" stroke-linecap="round"/>
-  <path d="M42 30 C50 40 42 48 50 56" stroke="url(#g)" stroke-width="4" fill="none" stroke-linecap="round"/>
-  <circle cx="14" cy="56" r="4" fill="#7c5cff"/><circle cx="32" cy="58" r="4" fill="#4aa8d8"/><circle cx="50" cy="56" r="4" fill="#21d4b4"/>
-  <circle cx="28" cy="20" r="2.5" fill="#0d0f16"/><circle cx="36" cy="20" r="2.5" fill="#0d0f16"/>
+
+  <rect width="64" height="64" rx="14" fill="url(#bg)" />
+  <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" fill="none" stroke="#1e293b" />
+
+  <!-- commit graph: the active trunk in emerald, a side branch in slate -->
+  <g fill="none" stroke-linecap="round" stroke-width="1.2">
+    <path d="M37 47 H49" stroke="#334155" />
+    <path d="M49 42 C55 43 55 45 55 49" stroke="#334155" />
+    <path d="M49 37 V53" stroke="#10b981" />
+  </g>
+  <circle cx="55" cy="50" r="1.7" fill="#0b0f12" stroke="#475569" stroke-width="1.1" />
+  <circle cx="49" cy="53" r="1.9" fill="#0b0f12" stroke="#10b981" stroke-width="1.2" />
+  <circle cx="49" cy="37" r="2.1" fill="#10b981" filter="url(#glow)" />
+
+  <!-- faceted raven head, facing right -->
+  <polygon points="15,32 22,17 34,13 28,30" fill="#334155" />
+  <polygon points="34,13 40,20 28,30" fill="#2b3a4f" />
+  <polygon points="40,20 58,30 42,26" fill="#334155" />
+  <polygon points="42,26 58,30 40,31" fill="#1e293b" />
+  <polygon points="28,30 40,20 42,26 40,31 38,40" fill="#243247" />
+  <polygon points="15,32 28,30 38,40 24,46" fill="#1e293b" />
+  <polygon points="15,32 24,46 14,56" fill="#19222d" />
+  <polygon points="24,46 38,40 35,56 14,56" fill="#243247" />
+  <polygon points="15,32 22,17 34,13 40,20 58,30 40,31 38,40 35,56 14,56" fill="none" stroke="#475569" stroke-width="0.6" stroke-linejoin="round" />
+
+  <!-- the eye -->
+  <circle cx="32" cy="22" r="2.6" fill="#00ff9d" filter="url(#glow)" />
+  <circle cx="32.5" cy="22" r="0.9" fill="#0b0f12" />
 </svg>
