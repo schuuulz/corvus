@@ -2,6 +2,7 @@ mod commands;
 mod commands_ext;
 pub mod git;
 pub mod integrations;
+mod migration;
 pub mod settings;
 pub mod system;
 mod terminal;
@@ -20,8 +21,11 @@ pub fn run() {
         .manage(watcher::Watchers::default())
         .manage(terminal::Terminals::default())
         .setup(|app| {
-            let dir = app.path().app_config_dir()?;
-            app.manage(settings::Settings::load(dir.join("settings.json")));
+            let path = app.path().app_config_dir()?.join("settings.json");
+            // A failed copy only means starting from default settings, which
+            // is no reason to refuse to launch.
+            let _ = migration::adopt_legacy_settings(&path);
+            app.manage(settings::Settings::load(path));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

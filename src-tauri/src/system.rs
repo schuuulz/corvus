@@ -6,22 +6,40 @@ use serde::Serialize;
 use std::path::Path;
 use std::process::Command;
 
-const SERVICE: &str = "kraken-craft";
+const SERVICE: &str = "corvus";
+/// Keychain service used before the rename to Corvus.
+const LEGACY_SERVICE: &str = "kraken-craft";
 
-fn entry(key: &str) -> Result<keyring::Entry> {
-    keyring::Entry::new(SERVICE, key).map_err(|e| Error::Msg(e.to_string()))
+fn entry(service: &str, key: &str) -> Result<keyring::Entry> {
+    keyring::Entry::new(service, key).map_err(|e| Error::Msg(e.to_string()))
 }
 
 pub fn secret_set(key: &str, value: &str) -> Result<()> {
-    entry(key)?.set_password(value).map_err(|e| Error::Msg(e.to_string()))
+    entry(SERVICE, key)?.set_password(value).map_err(|e| Error::Msg(e.to_string()))
 }
 
 pub fn secret_get(key: &str) -> Option<String> {
-    entry(key).ok()?.get_password().ok()
+    entry(SERVICE, key).ok()?.get_password().ok().or_else(|| adopt_legacy_secret(key))
+}
+
+/// Moves a secret saved under the legacy service name to the current one.
+fn adopt_legacy_secret(key: &str) -> Option<String> {
+    let legacy = entry(LEGACY_SERVICE, key).ok()?;
+    let value = legacy.get_password().ok()?;
+    if secret_set(key, &value).is_ok() {
+        // Once copied, a leftover legacy entry is harmless.
+        let _ = legacy.delete_credential();
+    }
+    Some(value)
 }
 
 pub fn secret_delete(key: &str) -> Result<()> {
-    match entry(key)?.delete_credential() {
+    delete_entry(LEGACY_SERVICE, key)?;
+    delete_entry(SERVICE, key)
+}
+
+fn delete_entry(service: &str, key: &str) -> Result<()> {
+    match entry(service, key)?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => Err(Error::Msg(e.to_string())),
     }

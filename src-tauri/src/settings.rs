@@ -2,6 +2,7 @@
 //! `{ "global": {..}, "repos": { "<repo path>": {..} } }`.
 //! Values that belong to git config are stored in git, not here.
 
+use crate::migration;
 use serde_json::{json, Map, Value};
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -13,11 +14,12 @@ pub struct Settings {
 
 impl Settings {
     pub fn load(path: PathBuf) -> Self {
-        let data = std::fs::read(&path)
+        let mut data = std::fs::read(&path)
             .ok()
             .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
             .filter(|v| v.is_object())
             .unwrap_or_else(|| json!({ "global": {}, "repos": {} }));
+        migration::rename_legacy_theme(&mut data);
         Settings { path, data: Mutex::new(data) }
     }
 
@@ -74,5 +76,13 @@ mod tests {
         assert_eq!(v["repos"]["C:/r"]["encoding"], "utf-16le");
         again.set(None, "theme", Value::Null).unwrap();
         assert!(again.get()["global"].get("theme").is_none());
+    }
+
+    #[test]
+    fn load_renames_legacy_theme() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        std::fs::write(&p, r#"{ "global": { "theme": "kraken-light" }, "repos": {} }"#).unwrap();
+        assert_eq!(Settings::load(p).get()["global"]["theme"], "corvus-light");
     }
 }
