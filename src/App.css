@@ -426,6 +426,10 @@ button.primary { font-weight: 600; letter-spacing: 0.2px; }
 .field { display: flex; flex-direction: column; gap: 5px; margin: 10px 0; }
 .field > span { font-size: 12px; color: var(--muted); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.modal-note { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 10px; border-radius: var(--radius); background: var(--warn-bg); font-size: 12px; animation: fade 150ms; }
+.modal-note svg { flex: none; color: var(--mod); }
+.modal-note.info { background: var(--active); }
+.modal-note.info svg { color: var(--accent-hi); }
 .palette { width: min(620px, 100%); background: var(--raised); border: 1px solid var(--border-strong); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); animation: pop 120ms ease-out; }
 .palette input { border: none !important; border-bottom: 1px solid var(--border) !important; border-radius: 0 !important; padding: 14px 16px !important; font-size: 15px; box-shadow: none !important; background: transparent !important; }
 .palette-list { max-height: 52vh; overflow: auto; padding: 5px; }

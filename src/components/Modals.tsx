@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { ext } from "../api";
 import * as A from "../actions";
-import { useRepoIntegration } from "../hooks";
 import { THEMES } from "../settings";
 import { useRepo, useStore } from "../store";
 
@@ -47,66 +45,6 @@ export function CloneDialog() {
           <button type="submit" className="primary" disabled={!url.trim() || !dest || !!busy}>Clone</button>
         </div>
       </form>
-    </div>
-  );
-}
-
-export function CreatePullRequest({ branch }: { branch: string }) {
-  const { data } = useRepo();
-  const ri = useRepoIntegration();
-  const { set, toast, openPrefs } = useStore.getState();
-  const locals = data?.refs?.locals.map((b) => b.name) ?? [];
-  const guessBase = ["main", "master", "develop"].find((b) => locals.includes(b) && b !== branch) ?? locals.find((b) => b !== branch) ?? "main";
-  const [base, setBase] = useState(guessBase);
-  const [title, setTitle] = useState(branch.split("/").pop()?.replace(/[-_]/g, " ") ?? branch);
-  const [body, setBody] = useState("");
-  const [busy, setBusy] = useState(false);
-  const close = () => set({ modal: null });
-  const submit = async () => {
-    if (!ri) return;
-    setBusy(true);
-    try {
-      const { integration: i, remote } = ri;
-      const url = await ext.createPr(i.kind, i.host, remote.path, branch, base, title, body);
-      toast("Pull request created", "success");
-      close();
-      if (url) void A.openExternal(url);
-    } catch (e) {
-      toast(String(e), "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="modal-back" onClick={close}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Create pull request</h3>
-        {!ri ? (
-          <>
-            <p>This repository's remote isn't linked to a connected GitHub or GitLab account.</p>
-            <div className="modal-actions">
-              <button onClick={close}>Cancel</button>
-              <button className="primary" onClick={() => openPrefs("integrations")}>Connect an integration</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="muted small">{ri.integration.host} · {ri.remote.path} · make sure <b>{branch}</b> is pushed first.</p>
-            <label className="field">
-              <span>Merge {branch} into</span>
-              <select value={base} onChange={(e) => setBase(e.target.value)}>
-                {locals.filter((b) => b !== branch).map((b) => <option key={b}>{b}</option>)}
-              </select>
-            </label>
-            <label className="field"><span>Title</span><input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} /></label>
-            <label className="field"><span>Description</span><textarea rows={6} value={body} onChange={(e) => setBody(e.target.value)} /></label>
-            <div className="modal-actions">
-              <button onClick={close}>Cancel</button>
-              <button className="primary" disabled={busy || !title.trim()} onClick={submit}>{busy ? "Creating…" : "Create pull request"}</button>
-            </div>
-          </>
-        )}
-      </div>
     </div>
   );
 }
@@ -196,7 +134,8 @@ export function CommandPalette() {
         { label: "Repository preferences", run: () => openPrefs("repo-commit") },
         { label: "Refresh", hint: "F5", run: () => useStore.getState().refresh() },
       );
-      if (data?.info?.headBranch) c.push({ label: "Create pull request…", run: () => set({ modal: { kind: "pr", branch: data.info!.headBranch! } }) });
+      const head = data?.info?.headBranch;
+      if (head && A.pullRequestHost()) c.push({ label: "Create pull request…", run: () => A.openPullRequest(head) });
       for (const b of data?.refs?.locals ?? []) if (!b.isHead) c.push({ label: `Checkout ${b.name}`, run: () => A.checkout(b.name) });
       for (const b of data?.refs?.locals ?? []) if (!b.isHead) c.push({ label: `Merge ${b.name} into current`, run: () => A.merge(b.name) });
     }

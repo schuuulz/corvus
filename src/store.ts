@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api, ConflictCheck, DiffMode, ext, Gitflow, Graph, RepoInfo, Refs, SettingsData, WorkStatus } from "./api";
+import { api, ConflictCheck, DiffMode, ext, Gitflow, Graph, Integration, RemoteRef, RepoAccess, RepoInfo, Refs, SettingsData, WorkStatus } from "./api";
 import { GLOBAL_DEFAULTS, GlobalKey, GlobalSettings, REPO_DEFAULTS, RepoKey, RepoSettings } from "./settings";
 import { t } from "./i18n";
 
@@ -52,7 +52,23 @@ export interface RunOpts<T> {
 export const TOAST_DURATION: Record<ToastKind, number> = { loading: 0, success: 3500, info: 4000, warning: 7000, error: 10000 };
 const MAX_TOASTS = 4;
 
-type Modal = null | "palette" | "clone" | "shortcuts" | { kind: "rebase"; base: string | null } | { kind: "pr"; branch: string };
+type Modal =
+  | null
+  | "palette"
+  | "clone"
+  | "shortcuts"
+  | { kind: "rebase"; base: string | null }
+  | { kind: "pr"; branch: string; base?: string };
+
+/** The hosted repository behind a local one, reached through a connected integration. */
+export interface RepoIntegration {
+  integration: Integration;
+  remote: RemoteRef;
+  /** The git remote that points at the hosted repository. */
+  remoteName: string;
+  /** null until the provider answers (or when it can't be reached). */
+  access: RepoAccess | null;
+}
 
 /** Tab id of the "New Tab" page. */
 export const NEW_TAB = "kc:new";
@@ -87,6 +103,10 @@ interface State {
   /** Open Gitflow panel, started from a main branch in the left panel. */
   gitflowPanel: { base: string } | null;
   loadGitflow(repo?: string): Promise<Gitflow | null>;
+  /** Hosted repository per local repo (null: no connected integration serves it). */
+  repoIntegration: Record<string, RepoIntegration | null>;
+  /** Bumped when a pull request is opened, so open PR lists reload. */
+  pullRequestsVersion: number;
 
   init(): Promise<void>;
   setG<K extends GlobalKey>(key: K, value: GlobalSettings[K]): Promise<void>;
@@ -180,6 +200,8 @@ export const useStore = create<State>((set, get) => ({
   hoverBranch: null,
   gitflow: {},
   gitflowPanel: null,
+  repoIntegration: {},
+  pullRequestsVersion: 0,
 
   async loadGitflow(path) {
     const repo = path ?? get().active;

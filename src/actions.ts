@@ -6,10 +6,12 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
-import { api, ext, Gitflow, GraphRow, LocalBranch, OpOutcome, RemoteBranch } from "./api";
+import { createElement } from "react";
+import { Cloud, GitPullRequest } from "lucide-react";
+import { api, ext, Gitflow, GraphRow, LocalBranch, NewPullRequest, OpOutcome, RefLabel, RemoteBranch } from "./api";
 import { fb } from "./feedback";
 import { t } from "./i18n";
-import { g, gitMessage, MenuEntry, NEW_TAB, r, shortSha, useStore } from "./store";
+import { g, gitMessage, MenuEntry, NEW_TAB, r, RepoIntegration, shortSha, useStore } from "./store";
 
 const S = () => useStore.getState();
 const active = () => {
@@ -365,7 +367,85 @@ export async function gitflowFinish(kind: FlowKind, name: string) {
   });
   return !!done;
 }
+
+// --- pull requests -----------------------------------------------------------
+
+/** The active repo's hosted repository, when its account may open pull requests there. */
+export function pullRequestHost(): RepoIntegration | null {
+  const repo = active();
+  const ri = repo ? S().repoIntegration[repo] : null;
+  return ri?.access?.canPush ? ri : null;
+}
+
+/** Branch names on `remote`: the only branches a pull request can target. */
+export function remoteBranchNames(remote: string): string[] {
+  const repo = active();
+  const branches = repo ? S().repos[repo]?.refs?.remoteBranches ?? [] : [];
+  return branches.filter((b) => b.remote === remote).map((b) => b.branch);
+}
+
+export function openPullRequest(source: string, target?: string) {
+  S().set({ modal: { kind: "pr", branch: source, base: target } });
+}
+
+/**
+ * Opens a pull request on the hosted repo, pushing its source branch first
+ * when `push` is set, then shows it in the browser. Resolves to whether it
+ * was created.
+ */
+export async function createPullRequest(host: RepoIntegration, pr: NewPullRequest, push: boolean): Promise<boolean> {
+  const { integration: i, remote, remoteName } = host;
+  const created = await S().run(
+    t("pr.loading"),
+    async (repo) => {
+      if (push) await api.pushBranch(repo, remoteName, pr.source);
+      return ext.createPr(i.kind, i.host, remote.path, pr);
+    },
+    {
+      loadingDesc: `${pr.source} → ${pr.target}`,
+      success: (c) => ({ title: t("pr.created"), description: `#${c.number} ${c.title}` }),
+      error: (message) => ({ title: t("pr.failed"), description: message }),
+    },
+  );
+  if (!created) return false;
+  S().set({ pullRequestsVersion: S().pullRequestsVersion + 1 });
+  void openExternal(created.url);
+  return true;
+}
+
+/** "Merge <current> into <target>…" per target on the hosted repo; none without permission. */
+function pullRequestItems(targets: string[]): MenuEntry[] {
+  const source = head();
+  const host = pullRequestHost();
+  if (!source || !host) return [];
+  const hosted = new Set(remoteBranchNames(host.remoteName));
+  return [...new Set(targets)]
+    .filter((target) => target !== source && hosted.has(target))
+    .map((target) => ({
+      icon: createElement(GitPullRequest, { size: 13 }),
+      label: t("pr.menu", { source, target }),
+      action: () => openPullRequest(source, target),
+    }));
+}
+
+/** The branch a graph label names on `remote`, if it names one there. */
+function branchOn(remote: string, label: RefLabel): string | null {
+  if (label.kind === "local") return label.name;
+  if (label.kind === "remote" && label.remotes.includes(remote)) return label.name.slice(remote.length + 1);
+  return null;
+}
+
+/** Pull request items targeting the branches labelled in the graph. */
+function labelPullRequestItems(labels: RefLabel[]): MenuEntry[] {
+  const host = pullRequestHost();
+  if (!host) return [];
+  return pullRequestItems(labels.map((l) => branchOn(host.remoteName, l)).filter((b): b is string => b !== null));
+}
+
 // --- menus -------------------------------------------------------------------
+
+/** A menu group introduced by a separator; an empty group disappears. */
+const group = (items: MenuEntry[]): MenuEntry[] => (items.length ? ["sep", ...items] : []);
 
 export function localBranchMenu(b: LocalBranch): MenuEntry[] {
   const cur = head();
@@ -377,12 +457,13 @@ export function localBranchMenu(b: LocalBranch): MenuEntry[] {
     "sep",
     { label: `Merge ${b.name} into ${cur ?? "HEAD"}`, action: () => merge(b.name), disabled: b.isHead },
     { label: `Rebase ${cur ?? "HEAD"} onto ${b.name}`, action: () => rebase(b.name), disabled: b.isHead },
+    ...group(pullRequestItems([b.name])),
     "sep",
     ...remotes.map((rm) => ({
       label: `Push to ${rm.name}/${b.name}`,
       action: () => S().run("Push", (rp) => api.pushBranch(rp, rm.name, b.name), { success: () => ({ title: t("push.title"), description: `${b.name} → ${rm.name}/${b.name}` }) }),
     })),
-    { label: "Create pull request…", action: () => S().set({ modal: { kind: "pr", branch: b.name } }) },
+    ...(pullRequestHost() ? [{ label: "Create pull request…", action: () => openPullRequest(b.name) }] : []),
     "sep",
     { label: "Create branch here", action: () => newBranch(b.oid) },
     { label: "Rename…", action: () => renameBranch(b.name) },
@@ -419,6 +500,7 @@ export function commitMenu(row: GraphRow): MenuEntry[] {
     { label: "Checkout this commit (detached)", action: () => checkout(row.oid) },
     { label: "Create branch here…", action: () => newBranch(row.oid) },
     { label: "Create tag here…", action: () => newTag(row.oid) },
+    ...group(labelPullRequestItems(row.refs)),
     "sep",
     { label: "Cherry-pick commit", action: () => cherryPick(row.oid), disabled: row.isHead },
     { label: "Revert commit", action: () => revert(row.oid) },
@@ -434,6 +516,25 @@ export function commitMenu(row: GraphRow): MenuEntry[] {
     "sep",
     { label: "Copy commit SHA", action: () => navigator.clipboard.writeText(row.oid) },
   ];
+}
+
+/**
+ * Menu for a branch label in the graph. A grouped label is one branch in
+ * several places: it offers the local branch menu, then the remote-only
+ * actions for each remote copy.
+ */
+export function refLabelMenu(label: RefLabel): MenuEntry[] {
+  const repo = active();
+  const refs = repo ? S().repos[repo]?.refs : null;
+  const local = label.kind === "local" ? refs?.locals.find((b) => b.name === label.name) : undefined;
+  const remoteNames = label.kind === "local" ? label.remotes.map((name) => `${name}/${label.name}`) : [label.name];
+  const remotes = remoteNames.flatMap((n) => refs?.remoteBranches.filter((b) => b.name === n) ?? []);
+  const items: MenuEntry[] = local ? localBranchMenu(local) : labelPullRequestItems([label]);
+  for (const rb of remotes) {
+    const own = remoteBranchMenu(rb).filter((x) => x !== "sep" && (!local || !x.label.startsWith("Checkout")));
+    items.push("sep", { label: rb.name, disabled: true, icon: createElement(Cloud, { size: 12 }) }, ...own);
+  }
+  return items;
 }
 
 export function dropBranchMenu(src: string, row: GraphRow): MenuEntry[] {

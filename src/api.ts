@@ -131,6 +131,9 @@ export type IntegrationKind = "github" | "github-enterprise" | "gitlab" | "gitla
 export interface Integration { id: string; kind: IntegrationKind; host: string; username: string; name: string; avatar: string }
 export interface Account { username: string; name: string; avatar: string }
 export interface PullRequest { number: number; title: string; url: string; author: string; source: string; target: string; draft: boolean; updated: string }
+export interface NewPullRequest { source: string; target: string; title: string; body: string; draft: boolean }
+/** What the connected account may do on the hosted repository. */
+export interface RepoAccess { canPush: boolean; defaultBranch: string }
 export interface Issue { number: number; title: string; url: string; author: string; labels: string[] }
 export interface RemoteRef { host: string; path: string }
 export interface LogEntry { id: number; time: number; cwd: string; args: string; ok: boolean; ms: number; output: string }
@@ -184,8 +187,8 @@ export const ext = {
   disconnect: (kind: IntegrationKind, host: string) => call<void>("integration_disconnect", { kind, host }),
   pulls: (kind: IntegrationKind, host: string, repo: string) => call<PullRequest[]>("integration_pulls", { kind, host, repo }),
   issues: (kind: IntegrationKind, host: string, repo: string) => call<Issue[]>("integration_issues", { kind, host, repo }),
-  createPr: (kind: IntegrationKind, host: string, repo: string, source: string, target: string, title: string, body: string) =>
-    call<string>("integration_create_pr", { kind, host, repo, source, target, title, body }),
+  repoAccess: (kind: IntegrationKind, host: string, repo: string) => call<RepoAccess>("integration_repo_access", { kind, host, repo }),
+  createPr: (kind: IntegrationKind, host: string, repo: string, pr: NewPullRequest) => call<PullRequest>("integration_create_pr", { kind, host, repo, pr }),
   addSshKey: (kind: IntegrationKind, host: string, title: string, publicKeyPath: string) => call<void>("integration_add_ssh_key", { kind, host, title, publicKeyPath }),
   parseRemote: (url: string) => call<RemoteRef | null>("parse_remote", { url }),
 };

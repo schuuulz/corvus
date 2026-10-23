@@ -120,6 +120,7 @@ pub fn run() {
             integration_disconnect,
             integration_pulls,
             integration_issues,
+            integration_repo_access,
             integration_create_pr,
             integration_add_ssh_key,
             parse_remote,
