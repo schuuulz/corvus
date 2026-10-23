@@ -6,13 +6,14 @@
   "packages": {
     ".": {
       "release-type": "node",
-      "package-name": "kraken-craft",
+      "package-name": "corvus",
+      "last-release-sha": "e6fdc18be8fd315ab2a37cd436a66f818d5c6abc",
       "initial-version": "0.1.0",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         { "type": "json", "path": "src-tauri/tauri.conf.json", "jsonpath": "$.version" },
         { "type": "toml", "path": "src-tauri/Cargo.toml", "jsonpath": "$.package.version" },
-        { "type": "toml", "path": "src-tauri/Cargo.lock", "jsonpath": "$.package[?(@.name.value == 'kraken-craft')].version" }
+        { "type": "toml", "path": "src-tauri/Cargo.lock", "jsonpath": "$.package[?(@.name.value == 'corvus')].version" }
       ],
       "changelog-sections": [
         { "type": "feat", "section": "Features" },

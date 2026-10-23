@@ -1,14 +1,14 @@
 <p align="center">
-  <img src="app-icon.svg" width="96" alt="kraken-craft logo" />
+  <img src="app-icon.svg" width="96" alt="Corvus logo" />
 </p>
 
-<h1 align="center">kraken-craft</h1>
+<h1 align="center">Corvus</h1>
 
 <p align="center">A fast, friendly desktop Git client for Windows, Linux and macOS.</p>
 
 ---
 
-kraken-craft is a graphical Git client built with **Tauri 2**, **Rust** and **React**. It is an independent, clean-room project: all code, visuals and assets are original.
+Corvus is a graphical Git client built with **Tauri 2**, **Rust** and **React**. It is an independent, clean-room project: all code, visuals and assets are original.
 
 ## Features
 
@@ -47,7 +47,7 @@ Get the latest installer from **[Releases](../../releases/latest)**:
 
 > **Unsigned builds.** The installers are not code-signed yet.
 > - **Windows:** SmartScreen may warn you. Choose *More info › Run anyway*.
-> - **macOS:** right-click the app and choose *Open*, or run `xattr -cr "/Applications/kraken-craft.app"`.
+> - **macOS:** right-click the app and choose *Open*, or run `xattr -cr "/Applications/Corvus.app"`.
 
 ## Development
 

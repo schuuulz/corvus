@@ -61,7 +61,7 @@ pub struct SshKeyPair {
 pub fn ssh_generate(path: Option<&str>, comment: &str, passphrase: &str) -> Result<SshKeyPair> {
     let path = path
         .map(String::from)
-        .unwrap_or_else(|| format!("{}/.ssh/kraken_craft_ed25519", home()));
+        .unwrap_or_else(|| format!("{}/.ssh/corvus_ed25519", home()));
     if Path::new(&path).exists() {
         return msg(format!("{path} already exists"));
     }

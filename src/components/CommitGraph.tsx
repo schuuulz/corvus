@@ -137,7 +137,7 @@ function Pills({ row, width, trunks }: { row: GraphRow; width: number; trunks: n
             className={`pill ${r.kind}${r.current ? " current" : ""}`}
             style={{ background: color, color: r.kind === "remote" ? color : undefined }}
             draggable
-            onDragStart={(e) => e.dataTransfer.setData("text/kc-branch", r.name)}
+            onDragStart={(e) => e.dataTransfer.setData("text/corvus-branch", r.name)}
             onDoubleClick={(e) => {
               e.stopPropagation();
               if (!r.current) void A.checkout(r.name, r.kind === "remote");
@@ -335,9 +335,9 @@ export default function CommitGraph() {
           e.preventDefault();
           openMenu(e, commitMenu(row));
         }}
-        onDragOver={(e) => e.dataTransfer.types.includes("text/kc-branch") && e.preventDefault()}
+        onDragOver={(e) => e.dataTransfer.types.includes("text/corvus-branch") && e.preventDefault()}
         onDrop={(e) => {
-          const src = e.dataTransfer.getData("text/kc-branch");
+          const src = e.dataTransfer.getData("text/corvus-branch");
           if (src) openMenu(e, dropBranchMenu(src, row));
         }}
       >

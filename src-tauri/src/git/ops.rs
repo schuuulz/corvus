@@ -233,7 +233,7 @@ pub fn rebase_interactive(path: &str, base: Option<&str>, todo: &[TodoItem]) -> 
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
-    let dir = std::env::temp_dir().join(format!("kraken-craft-rebase-{stamp}"));
+    let dir = std::env::temp_dir().join(format!("corvus-rebase-{stamp}"));
     std::fs::create_dir_all(&dir)?;
     let mut script = String::new();
     for (i, t) in todo.iter().enumerate() {

@@ -45,8 +45,8 @@ jobs:
 
       - name: Git identity for tests
         run: |
-          git config --global user.name "kraken-craft CI"
-          git config --global user.email "ci@kraken-craft.invalid"
+          git config --global user.name "Corvus CI"
+          git config --global user.email "ci@corvus.invalid"
           git config --global init.defaultBranch main
 
       - uses: actions/setup-node@v4

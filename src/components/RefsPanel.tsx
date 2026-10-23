@@ -11,7 +11,7 @@ import { useRepo, useStore } from "../store";
 import { useFlowBases } from "./GitflowPanel";
 
 function Section({ id, title, count, children, actions, icon }: { id: string; title: string; count?: number; children: ReactNode; actions?: ReactNode; icon: ReactNode }) {
-  const key = `kc.section.${id}`;
+  const key = `corvus.section.${id}`;
   const [open, setOpen] = useState(() => {
     try {
       return localStorage.getItem(key) !== "0";
@@ -80,7 +80,7 @@ function BranchTree({ node, depth, bases }: { node: BranchNode; depth: number; b
           openMenu(e, A.localBranchMenu(b));
         }}
         draggable
-        onDragStart={(e) => e.dataTransfer.setData("text/kc-branch", b.name)}
+        onDragStart={(e) => e.dataTransfer.setData("text/corvus-branch", b.name)}
         title={b.upstream ? `${b.name} → ${b.upstream}` : `${b.name} (no upstream)`}
       >
         {b.isHead ? <Check size={13} className="cur" /> : <GitBranch size={13} />}
@@ -291,7 +291,7 @@ export default function RefsPanel({ onCollapse }: { onCollapse?: () => void }) {
                     openMenu(e, A.remoteBranchMenu(b));
                   }}
                   draggable
-                  onDragStart={(e) => e.dataTransfer.setData("text/kc-branch", b.name)}
+                  onDragStart={(e) => e.dataTransfer.setData("text/corvus-branch", b.name)}
                 >
                   <GitBranch size={13} />
                   <span className="name">{b.branch}</span>
