@@ -20,6 +20,7 @@ export function TabBar() {
     <div className="tabbar">
       <div className="brand">
         <Logo size={20} />
+        Corvus
       </div>
       <div className="tabs-scroll">
         {tabs.map((t) => (

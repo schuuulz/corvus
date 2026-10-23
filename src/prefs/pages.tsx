@@ -111,7 +111,7 @@ export function UiCustomization() {
   );
 }
 
-const MONO_FONTS = ["Cascadia Code", "Cascadia Mono", "Consolas", "JetBrains Mono", "Fira Code", "Source Code Pro", "Hack", "IBM Plex Mono", "Roboto Mono", "Ubuntu Mono", "Courier New", "Lucida Console"];
+const MONO_FONTS = ["Geist Mono", "Cascadia Code", "Cascadia Mono", "Consolas", "JetBrains Mono", "Fira Code", "Source Code Pro", "Hack", "IBM Plex Mono", "Roboto Mono", "Ubuntu Mono", "Courier New", "Lucida Console"];
 const PROP_FONTS = ["Segoe UI", "Arial", "Calibri", "Inter", "Verdana", "Georgia"];
 
 function FontSelect({ k, monoKey, label, help }: { k: "editorFont" | "termFont"; monoKey?: "editorMonoOnly"; label: string; help?: string }) {

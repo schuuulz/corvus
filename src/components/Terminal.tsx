@@ -28,7 +28,7 @@ function Session({ id, cwd, visible }: { id: number; cwd: string; visible: boole
 
   useEffect(() => {
     const t = new XTerm({
-      fontFamily: `"${font}", Consolas, monospace`,
+      fontFamily: `"${font}", ${readVar("--font-mono")}`,
       fontSize: size,
       lineHeight,
       cursorStyle: cursor,
@@ -73,7 +73,7 @@ function Session({ id, cwd, visible }: { id: number; cwd: string; visible: boole
   useEffect(() => {
     const t = term.current;
     if (!t) return;
-    t.options.fontFamily = `"${font}", Consolas, monospace`;
+    t.options.fontFamily = `"${font}", ${readVar("--font-mono")}`;
     t.options.fontSize = size;
     t.options.lineHeight = lineHeight;
     t.options.cursorStyle = cursor;

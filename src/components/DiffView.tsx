@@ -17,7 +17,7 @@ export function useEditorOptions() {
   const lines = useG("editorLineNumbers");
   const wrap = useG("editorWordWrap");
   return {
-    fontFamily: `"${font}", var(--mono), monospace`,
+    fontFamily: `"${font}", var(--font-mono)`,
     fontSize: size,
     tabSize: tab,
     lineNumbers: lines ? ("on" as const) : ("off" as const),

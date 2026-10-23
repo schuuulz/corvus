@@ -46,7 +46,7 @@ export const GLOBAL_DEFAULTS = {
   colSha: false,
   showDescription: "always" as "always" | "hover" | "never",
   // editor
-  editorFont: "Cascadia Code",
+  editorFont: "Geist Mono",
   editorMonoOnly: true,
   editorFontSize: 13,
   editorTabSize: 4,
@@ -55,7 +55,7 @@ export const GLOBAL_DEFAULTS = {
   editorLineNumbers: true,
   editorWordWrap: false,
   // terminal
-  termFont: "Cascadia Mono",
+  termFont: "Geist Mono",
   termFontSize: 13,
   termLineHeight: 1.2,
   termCursor: "bar" as "bar" | "block" | "underline",
