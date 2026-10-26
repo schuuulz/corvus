@@ -35,6 +35,7 @@ prints/
 *.p12
 *.pfx
 *.keystore
+*.password
 
 # Build artifacts
 src-tauri/gen/

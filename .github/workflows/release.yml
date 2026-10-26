@@ -12,6 +12,11 @@
 #
 # The build runs in this same workflow because tags created with
 # GITHUB_TOKEN do not trigger other workflows.
+#
+# The build jobs hold the updater signing key, so they get no more than they
+# need: actions pinned to commit SHAs, write access only where it is used,
+# the token only on the step that uploads, no persisted git credentials and
+# no caches another workflow could have written.
 
 name: Release
 
@@ -20,9 +25,7 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: release-${{ github.ref }}
@@ -31,12 +34,15 @@ concurrency:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         id: release
         with:
           config-file: release-please-config.json
@@ -65,18 +71,22 @@ jobs:
             args: "--target x86_64-apple-darwin"
             mac_arch: x64
     runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: write
+      # SignPath reads this job and downloads the unsigned artifact.
+      actions: read
     env:
       TAG: ${{ needs.release-please.outputs.tag_name }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Windows installers go through SignPath once it is configured
       # (docs/SIGNING.md); until then they are attached unsigned.
       SIGN_WINDOWS: ${{ matrix.name == 'windows-x64' && vars.SIGNPATH_ORGANIZATION_ID != '' }}
       # Not dist/: that is Vite's output, so it also holds the web assets.
       BUNDLE_DIR: release-assets
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
+          persist-credentials: false
 
       - name: Linux system dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -84,19 +94,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev pkg-config
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
-          cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
-
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-          key: ${{ matrix.name }}
 
       - run: npm ci
 
@@ -119,7 +123,7 @@ jobs:
           done
 
       # Builds only: the installers are attached below, once signed if needed.
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         id: tauri
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -132,12 +136,13 @@ jobs:
         shell: bash
         env:
           ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
-        run: node .github/scripts/collect-installers.mjs "$ARTIFACT_PATHS" "$BUNDLE_DIR" "${{ matrix.mac_arch }}"
+          MAC_ARCH: ${{ matrix.mac_arch }}
+        run: node .github/scripts/collect-installers.mjs "$ARTIFACT_PATHS" "$BUNDLE_DIR" "$MAC_ARCH"
 
       - name: Upload unsigned Windows installers
         if: env.SIGN_WINDOWS == 'true'
         id: unsigned
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: windows-unsigned
           path: |
@@ -146,7 +151,7 @@ jobs:
 
       - name: Sign Windows installers (SignPath)
         if: env.SIGN_WINDOWS == 'true'
-        uses: signpath/github-action-submit-signing-request@v1
+        uses: signpath/github-action-submit-signing-request@ced31329c0317e779dad2eec2a7c3bb46ea1343e # v1.3
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
@@ -172,25 +177,35 @@ jobs:
 
       - name: Attach installers to the release
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "$TAG" "$BUNDLE_DIR"/* --clobber
 
   release-manifests:
     needs: [release-please, build]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Update manifest and checksums
-        run: .github/scripts/release-manifests.sh "${{ needs.release-please.outputs.tag_name }}" "${{ needs.release-please.outputs.version }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+          VERSION: ${{ needs.release-please.outputs.version }}
+        run: .github/scripts/release-manifests.sh "$TAG" "$VERSION"
 
   sync-dev:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: dev
           fetch-depth: 0
