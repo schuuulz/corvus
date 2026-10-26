@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.5.0](https://github.com/schuuulz/corvus/compare/corvus-v0.4.1...corvus-v0.5.0) (2026-10-26)
+
+
+### Features
+
+* **graph:** anchor branch labels to the left of their column ([e9e9df8](https://github.com/schuuulz/corvus/commit/e9e9df84c81b5fcf9b925610e29beefde6885882))
+* **graph:** commit graph hover, merge avatars and WIP line ([ffac7d0](https://github.com/schuuulz/corvus/commit/ffac7d071e7d3a9ff1ed2a9657996a9733e34bb5))
+* **graph:** distinct, balanced lane colours ([0318e54](https://github.com/schuuulz/corvus/commit/0318e54f7f69a67781f3860d08ac00741651d715))
+* **graph:** fade row bands until the row is selected ([0f018cc](https://github.com/schuuulz/corvus/commit/0f018cc9892b3bd14646571aed377caa091fe21f))
+* **graph:** fold lanes one by one as the graph column narrows ([7fea5e8](https://github.com/schuuulz/corvus/commit/7fea5e8c11ffb433a65691274b8b9408b1014679))
+* **graph:** hint the branch of unlabelled commits on hover ([9105319](https://github.com/schuuulz/corvus/commit/9105319351852f7eccf0adcf3f9d6e34bec56179))
+* **graph:** hover rows like branches in the left panel ([55afde7](https://github.com/schuuulz/corvus/commit/55afde73b85eb5bfb3423ae64062b1e9e4ea7a2c))
+* **graph:** lighter lane strokes ([cfc1f18](https://github.com/schuuulz/corvus/commit/cfc1f18744f9d59a66163ca5751927b2d3970be3))
+* **graph:** link branch labels to their commit ([4253379](https://github.com/schuuulz/corvus/commit/42533797e69d0543dd44e3af1c09685bbb95024e))
+* **graph:** show only the name in the author column ([191a891](https://github.com/schuuulz/corvus/commit/191a891bde5d2894999bb5b02e2767ac0bdbcbb9))
+* **graph:** show the merger's avatar on merge commits ([e89a602](https://github.com/schuuulz/corvus/commit/e89a6022e854562313b50fc2ae2f98e0022d4c29))
+* **graph:** style the hover branch hint like a branch label ([6e35c99](https://github.com/schuuulz/corvus/commit/6e35c9900b38454dc05fb30383f2305785a2e7f8))
+* **graph:** thinner rings around commit avatars ([8e576f2](https://github.com/schuuulz/corvus/commit/8e576f21ab3b3a3a403f7c7346fe2da45e6ef05d))
+* **graph:** tint each row's graph cell in its lane colour ([7bd791b](https://github.com/schuuulz/corvus/commit/7bd791b2d93234927f6e61626590575209b1f559))
+
+
+### Bug Fixes
+
+* **deps:** override dompurify to 3.4.17 ([6c8d714](https://github.com/schuuulz/corvus/commit/6c8d714a0d39c9499f4825273feb69621bea2cbf))
+* **deps:** override dompurify to 3.4.17 ([ec82cc9](https://github.com/schuuulz/corvus/commit/ec82cc9fdd872835c9beb2d58438aa7fd6f83d3d))
+* **deps:** update tokio to 1.54.1 ([2b95a2c](https://github.com/schuuulz/corvus/commit/2b95a2c243aef8d04c54df0362a58e0dea76a2cd))
+* **deps:** update tokio to 1.54.1 ([b363889](https://github.com/schuuulz/corvus/commit/b3638891cd20191910c0efcf3d81eb3027fb4b9c))
+* **git:** reject option-like arguments and paths outside the repo ([4ccde44](https://github.com/schuuulz/corvus/commit/4ccde44102faf81f19bb7e3761e516e931d5c8bf))
+* **git:** reject option-like arguments and paths outside the repo ([eef9092](https://github.com/schuuulz/corvus/commit/eef9092a01ee88836678f8cedb05ff413a68fdd4))
+* **graph:** connect the WIP node to HEAD across rows ([bdd1d85](https://github.com/schuuulz/corvus/commit/bdd1d85b846a458947d2c181e762fed235cd30cc))
+* **graph:** draw label connectors as faint hairlines ([1b0c019](https://github.com/schuuulz/corvus/commit/1b0c0192bb2e6ebcd938dc89b28c4df1905c8543))
+* **graph:** hover rows with the branch highlight, square edges ([dcb1aad](https://github.com/schuuulz/corvus/commit/dcb1aad6289e794ddfa1514c4b4894723db07c90))
+* **graph:** keep converging lines visible up to their own column ([8161b5d](https://github.com/schuuulz/corvus/commit/8161b5dd447108ae4cf582de2be7bad92f80734c))
+* **graph:** keep each line's colour along its whole column ([a1b5dd0](https://github.com/schuuulz/corvus/commit/a1b5dd015793ae76bffbf051b3fe31363a0a6354))
+* **terminal:** never evaluate branch names in shell prompts ([8599b2d](https://github.com/schuuulz/corvus/commit/8599b2de6a8d05a9049035e3cbe22a079a3d9730))
+* **terminal:** never evaluate branch names in shell prompts ([a26e61f](https://github.com/schuuulz/corvus/commit/a26e61f78d58fffc4bf0ab1f17dffe0a62314222))
+* **ui:** blend the scrollbar corner into the background ([b7c4171](https://github.com/schuuulz/corvus/commit/b7c417187296913b55cd9ec5ff46f2ee46e244db))
+
 ## [0.4.1](https://github.com/schuuulz/corvus/compare/corvus-v0.4.0...corvus-v0.4.1) (2026-10-26)
 
 
