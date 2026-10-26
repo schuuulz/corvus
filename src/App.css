@@ -291,8 +291,11 @@ button.primary { font-weight: 600; letter-spacing: 0.2px; }
 /* Hover and the branch-tip mark are painted by a layer that starts at the
    message column (--row-start), leaving Branch/Tag and Graph untouched. */
 .row { isolation: isolate; }
-.row::before { content: ""; position: absolute; top: 0; bottom: 0; left: var(--row-start, 0); right: 0; z-index: -1; pointer-events: none; transition: background 80ms; }
+/* Same look as a hovered branch in the left panel (.ref-item): an inset,
+   rounded band and brighter text. */
+.row::before { content: ""; position: absolute; top: 0; bottom: 0; left: calc(var(--row-start, 0px) + 6px); right: 6px; z-index: -1; pointer-events: none; border-radius: var(--radius-sm); transition: background var(--ease); }
 .row:hover::before { background: var(--hover); }
+.row:hover .author-col { color: var(--text); }
 .row.selected { background: var(--sel); }
 .row.dim { opacity: 0.32; }
 .row.head .msg-sum { font-weight: 600; }
