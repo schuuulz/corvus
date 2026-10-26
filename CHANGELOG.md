@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/schuuulz/corvus/compare/corvus-v0.4.0...corvus-v0.4.1) (2026-10-26)
+
+
+### Bug Fixes
+
+* **ci:** collect installers outside the vite dist directory ([c5e6466](https://github.com/schuuulz/corvus/commit/c5e64665dfcb51eb1c28d40860327f7d4cc017f3))
+
 ## [0.4.0](https://github.com/schuuulz/corvus/compare/corvus-v0.3.0...corvus-v0.4.0) (2026-10-23)
 
 
