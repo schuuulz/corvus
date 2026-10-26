@@ -50,16 +50,15 @@ function angularPath(s: Seg) {
   return `${down} ${turnDown}`;
 }
 
-/** Commit node: the author's avatar (or initials) in a ring of the lane color, centred at `cx`. */
+/**
+ * Commit node: the author's avatar (or initials) in a ring of the lane color,
+ * centred at `cx`. A merge commit's author is whoever made the merge.
+ */
 function Node({ row, trunks, cx }: { row: GraphRow; trunks: number; cx: number }) {
   const url = useAvatar(row.email);
   const [broken, setBroken] = useState(false);
   const c = laneColor(row.color, trunks);
   const isTrunk = row.color < trunks;
-  if (row.parents.length > 1) {
-    // Merges stay small dots, so real work stands out.
-    return <circle cx={cx} cy={MID} r={isTrunk ? 5 : 4.5} fill={c} stroke="var(--bg)" strokeWidth={1.5} />;
-  }
   const r = 9;
   const clip = `av-${row.oid}`;
   return (
