@@ -5,8 +5,11 @@ import { useAvatar } from "../hooks";
 export const PALETTE = ["#10b981", "#7c5cff", "#f06292", "#4fc3f7", "#ffb74d", "#aed581", "#ba68c8", "#e57373", "#4db6ac", "#9575cd", "#fff176", "#a1887f"];
 /** Main branches (trunk columns) share one color across the graph. */
 export const TRUNK_COLOR = "#10b981";
-/** Colors cycled by every other branch line. */
-export const BRANCH_COLORS = ["#8B5CF6", "#F5A623", "#E54B4B", "#0090FF", "#5841D8", "#00A6C9"];
+/**
+ * Colors cycled by every other branch line: hues spread around the wheel at a
+ * similar brightness, none near the trunk green, ordered so neighbours contrast.
+ */
+export const BRANCH_COLORS = ["#8B5CF6", "#F59E0B", "#06B6D4", "#EC4899", "#3B82F6", "#F97316", "#D946EF", "#EF4444"];
 
 /**
  * Color of a graph line/label. The backend numbers trunk colors 0..trunks
