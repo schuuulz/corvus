@@ -192,9 +192,9 @@ pub fn discard(path: &str, files: &[String]) -> Result<()> {
     let wd = super::workdir(&repo)?;
     let mut tracked = Vec::new();
     for f in files {
+        let p = super::path_in_workdir(&wd, f)?;
         let st = repo.status_file(Path::new(f)).unwrap_or(Status::empty());
         if st.contains(Status::WT_NEW) {
-            let p = Path::new(&wd).join(f);
             if p.is_dir() {
                 std::fs::remove_dir_all(p)?;
             } else {
@@ -254,13 +254,15 @@ fn index_blob(repo: &Repository, file: &str) -> Option<Vec<u8>> {
 pub fn versions(path: &str, file: &str, old_file: Option<&str>, mode: &str, oid: Option<&str>, encoding: Option<&str>) -> Result<Versions> {
     let repo = super::open(path)?;
     let old_file = old_file.unwrap_or(file);
+    super::repo_relative(file)?;
+    super::repo_relative(old_file)?;
     let head_tree = repo.head().ok().and_then(|h| h.peel_to_tree().ok());
     let (orig, modi) = match mode {
         "staged" => (tree_blob(&repo, head_tree.as_ref(), old_file), index_blob(&repo, file)),
         "unstaged" => {
-            let wd = super::workdir(&repo)?;
+            let on_disk = super::path_in_workdir(&super::workdir(&repo)?, file)?;
             let base = index_blob(&repo, file).or_else(|| tree_blob(&repo, head_tree.as_ref(), file));
-            (base, std::fs::read(Path::new(&wd).join(file)).ok())
+            (base, std::fs::read(on_disk).ok())
         }
         "commit" => {
             let oid = oid.ok_or_else(|| Error::Msg("missing commit".into()))?;

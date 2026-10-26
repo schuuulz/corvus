@@ -333,3 +333,51 @@ fn pull_fast_forwards_if_possible_and_merges_otherwise() {
     assert_eq!(head_parents(&clone), 2);
     assert_eq!(read(&clone, "c.txt"), "upstream\n");
 }
+
+#[test]
+fn refuses_values_git_would_parse_as_options() {
+    let (_d, p) = repo();
+    write(&p, "a.txt", "one\n");
+    commit_all(&p, "one");
+    let marker = format!("{p}/ran");
+    let dir = tempfile::tempdir().unwrap();
+    let dest = dir.path().join("clone").to_string_lossy().replace('\\', "/");
+
+    assert!(ops::clone(&format!("--upload-pack=touch {marker}"), &dest, |_| {}).is_err());
+    assert!(ops::add_remote(&p, "evil", "--upload-pack=x").is_err());
+    assert!(ops::checkout(&p, "--orphan=x").is_err());
+    assert!(ops::create_branch(&p, "-f", None, false).is_err());
+    assert!(ops::merge(&p, "--into-name=x", false, false).is_err());
+    assert!(ops::rebase_interactive(&p, Some("--exec=x"), &[]).is_err());
+    assert!(!std::path::Path::new(&marker).exists(), "no option reached git");
+
+    // Plain values still work, and clone still clones.
+    ops::create_branch(&p, "feat/x", None, false).unwrap();
+    ops::clone(&p, &dest, |_| {}).unwrap();
+    assert_eq!(read(&dest, "a.txt"), "one\n");
+}
+
+#[test]
+fn file_paths_stay_inside_the_repository() {
+    let (d, p) = repo();
+    let outside = d.path().parent().unwrap().join("corvus-escape.txt");
+    let absolute = outside.to_string_lossy().replace('\\', "/");
+    let name = outside.file_name().unwrap().to_string_lossy().into_owned();
+
+    for file in [format!("../{name}"), absolute] {
+        assert!(conflict::resolve(&p, &file, "x").is_err(), "{file}");
+        assert!(status::versions(&p, &file, None, "unstaged", None, None).is_err(), "{file}");
+        assert!(status::versions(&p, &file, None, "staged", None, None).is_err(), "{file}");
+        assert!(status::discard(&p, std::slice::from_ref(&file)).is_err(), "{file}");
+    }
+    assert!(!outside.exists(), "nothing was written outside the repo");
+}
+
+#[test]
+fn cherry_pick_refuses_ids_that_are_not_hex() {
+    let (_d, p) = repo();
+    write(&p, "a.txt", "one\n");
+    commit_all(&p, "one");
+    assert!(outcome::cherry_pick(&p, "ééééééé").is_err());
+    assert!(outcome::revert(&p, "--abort").is_err());
+}
