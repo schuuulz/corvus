@@ -685,11 +685,11 @@ input.invalid, .gf-name.invalid { border-color: var(--danger) !important; box-sh
 .gf-init > button { align-self: flex-start; }
 @media (max-width: 720px) { .gf-cards { grid-template-columns: 1fr; } }
 /* A hovered row, and the tip a hovered branch in the left panel marks,
-   share one look: a band tinted with the row's lane colour (--branch). */
+   share one look: the message area tinted with the row's lane colour
+   (--branch), continuing the band the graph cell draws. */
 .row:hover::before,
 .row.hl-tip::before {
   background: color-mix(in srgb, var(--branch, var(--accent)) 20%, transparent);
-  box-shadow: inset 3px 0 0 var(--branch, var(--accent));
 }
 .row.hl-tip::before { animation: tip-in 160ms ease-out; }
 .row.hl-tip .msg-sum { font-weight: 600; }

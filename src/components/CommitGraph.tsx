@@ -92,6 +92,24 @@ function WipLine({ link }: { link: WipLink }) {
   return <path d={`M${link.x} 0 V${end}`} stroke="var(--muted)" strokeDasharray={`${WIP_DASH} ${WIP_DASH}`} strokeWidth={2} />;
 }
 
+/** Gap kept above and below a row's band, so rows read as separate strips. */
+const BAND_GAP = 2;
+const BAR_W = 3;
+
+/**
+ * The row's band: from the node to the edge of the graph cell, tinted in the
+ * lane colour and closed by a solid bar where the message column starts.
+ */
+function RowBand({ cx, width, color }: { cx: number; width: number; color: string }) {
+  const h = ROW_H - 2 * BAND_GAP;
+  return (
+    <>
+      <rect x={cx} y={BAND_GAP} width={Math.max(0, width - cx)} height={h} fill={color} fillOpacity={0.2} />
+      <rect x={width - BAR_W} y={BAND_GAP} width={BAR_W} height={h} fill={color} />
+    </>
+  );
+}
+
 /** Continues the branch label's connector (refs column) across the graph to the node. */
 function LabelLink({ row, cx, color }: { row: GraphRow; cx: number; color: string }) {
   if (!row.refs.length) return null;
@@ -108,6 +126,7 @@ function Lanes({ row, width, trunks, wipLink }: { row: GraphRow; width: number; 
   const sorted = [...row.segs].sort((a, b) => order(a) - order(b));
   return (
     <svg width={width} height={ROW_H} className="lanes">
+      <RowBand cx={x(row.lane)} width={width} color={laneColor(row.color, trunks)} />
       <LabelLink row={row} cx={x(row.lane)} color={laneColor(row.color, trunks)} />
       {wipLink && <WipLine link={wipLink} />}
       {sorted.map((s, i) => (
@@ -136,6 +155,7 @@ function CompactLane({ row, width, trunks, linkUp }: { row: GraphRow; width: num
   const color = laneColor(row.color, trunks);
   return (
     <svg width={width} height={ROW_H} className="lanes">
+      <RowBand cx={cx} width={width} color={color} />
       <LabelLink row={row} cx={cx} color={color} />
       {linkUp && <path d={`M${cx} 0 V${MID}`} stroke={color} strokeWidth={2} />}
       {row.parents.length > 0 && <path d={`M${cx} ${MID} V${ROW_H}`} stroke={color} strokeWidth={2} />}
@@ -435,7 +455,7 @@ export default function CommitGraph() {
             {compact ? (
               <CompactLane row={row} width={graphW} trunks={graph?.trunks ?? 0} linkUp={i > 0} />
             ) : (
-              <Lanes row={row} width={graphFit} trunks={graph?.trunks ?? 0} wipLink={wipLink} />
+              <Lanes row={row} width={graphW} trunks={graph?.trunks ?? 0} wipLink={wipLink} />
             )}
           </div>
         )}
