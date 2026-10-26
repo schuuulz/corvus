@@ -90,8 +90,8 @@ function Node({ row, trunks, cx }: { row: GraphRow; trunks: number; cx: number }
           {initials(row.author)}
         </text>
       )}
-      <circle cx={cx} cy={MID} r={r} fill="none" stroke={c} strokeWidth={row.isHead ? 3.5 : isTrunk ? 2.6 : 2} />
-      {row.isHead && <circle cx={cx} cy={MID} r={r + 3.5} fill="none" stroke={c} strokeOpacity={0.35} strokeWidth={2} />}
+      <circle cx={cx} cy={MID} r={r} fill="none" stroke={c} strokeWidth={row.isHead ? 2 : isTrunk ? 1.5 : 1.2} />
+      {row.isHead && <circle cx={cx} cy={MID} r={r + 3.5} fill="none" stroke={c} strokeOpacity={0.35} strokeWidth={1.5} />}
     </g>
   );
 }
