@@ -157,7 +157,7 @@ function Lanes({ row, width, trunks, wipLink }: { row: GraphRow; width: number; 
           key={i}
           d={segPath(s, lx)}
           stroke={laneColor(s.color, trunks)}
-          strokeWidth={s.color < trunks ? 3.2 : 2}
+          strokeWidth={s.color < trunks ? 2.4 : 1.6}
           // Butt caps keep vertical lines seamless across row boundaries.
           strokeLinecap={angular ? "butt" : "round"}
           strokeLinejoin="round"
