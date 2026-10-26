@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/schuuulz/corvus/compare/corvus-v0.3.0...corvus-v0.4.0) (2026-10-23)
+
+
+### Features
+
+* **updater:** trusted releases and an animated auto-updater ([74f4c2b](https://github.com/schuuulz/corvus/commit/74f4c2b65f5adfa55b1fc06fcb4b702ace84ba78))
+* **updater:** update automatically on launch, with a raven on the graph ([288436d](https://github.com/schuuulz/corvus/commit/288436d5a3fddf988281f4253315a8f1388a78d1))
+
 ## [0.3.0](https://github.com/schuuulz/corvus/compare/corvus-v0.2.0...corvus-v0.3.0) (2026-10-23)
 
 
