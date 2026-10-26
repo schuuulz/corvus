@@ -99,14 +99,15 @@ const BAR_W = 3;
 /**
  * The row's band: from the node to the edge of the graph cell, tinted in the
  * lane colour and closed by a solid bar where the message column starts.
+ * Faded until the row is selected (`.row-band` in App.css).
  */
 function RowBand({ cx, width, color }: { cx: number; width: number; color: string }) {
   const h = ROW_H - 2 * BAND_GAP;
   return (
-    <>
+    <g className="row-band">
       <rect x={cx} y={BAND_GAP} width={Math.max(0, width - cx)} height={h} fill={color} fillOpacity={0.2} />
       <rect x={width - BAR_W} y={BAND_GAP} width={BAR_W} height={h} fill={color} />
-    </>
+    </g>
   );
 }
 

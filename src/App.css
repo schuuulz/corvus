@@ -304,6 +304,8 @@ button.primary { font-weight: 600; letter-spacing: 0.2px; }
    through its right padding, and LabelLink carries it on to the node. */
 .refs-col .connector { flex: 1; min-width: 8px; margin-right: -8px; height: 1px; opacity: 0.35; }
 .lanes { flex: none; overflow: visible; }
+.row-band { opacity: 0.4; transition: opacity var(--ease); }
+.row.selected .row-band { opacity: 1; }
 .msg-col { gap: 8px; }
 .msg-sum { overflow: hidden; text-overflow: ellipsis; }
 .msg-desc { color: var(--muted); overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
