@@ -106,12 +106,13 @@ Examples: `feat(graph): one-click branch switch from the +N menu`, `fix(staging)
 
 ## CI/CD
 
-- `.github/workflows/ci.yml` runs on every push to `main`/`dev` and on every PR:
-  - gitleaks secret scan
+- `.github/workflows/secrets.yml` runs the gitleaks secret scan on every PR and on pushes to `main`/`dev`.
+- `.github/workflows/ci.yml` runs on PRs into `main` (dev → main, release PRs) and on pushes to `main`:
   - `npx tsc --noEmit`
   - `npm run build`
   - `cargo test --locked`, on Linux and Windows
-- It must be green before merging.
+- Feature PRs into `dev` only get the secret scan, so run the local checks below before opening them.
+- The checks that run must be green before merging.
 - `release.yml` only runs on pushes to `main`, so don't rename `main`.
 - Install dependencies with `npm ci` and keep `package-lock.json` and `src-tauri/Cargo.lock` committed and in sync.
 - Don't change `identifier` (`com.corvus.app`) in `tauri.conf.json`.
