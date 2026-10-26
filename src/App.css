@@ -299,9 +299,10 @@ button.primary { font-weight: 600; letter-spacing: 0.2px; }
 .row.dim { opacity: 0.32; }
 .row.head .msg-sum { font-weight: 600; }
 .row .col { flex: none; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; height: 100%; display: flex; align-items: center; }
-.refs-col { gap: 4px; justify-content: flex-end; position: relative; }
-/* Bridges the column's right padding; LabelLink carries it on to the node. */
-.refs-col .connector { position: absolute; right: 0; top: 50%; height: 1px; opacity: 0.35; transform: translateY(-50%); }
+.refs-col { gap: 4px; justify-content: flex-start; }
+/* Labels sit at the left; the connector fills the rest of the column,
+   through its right padding, and LabelLink carries it on to the node. */
+.refs-col .connector { flex: 1; min-width: 8px; margin-right: -8px; height: 1px; opacity: 0.35; }
 .lanes { flex: none; overflow: visible; }
 .msg-col { gap: 8px; }
 .msg-sum { overflow: hidden; text-overflow: ellipsis; }

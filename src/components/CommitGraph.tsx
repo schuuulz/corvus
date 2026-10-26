@@ -238,7 +238,7 @@ function Pills({ row, trunks }: { row: GraphRow; trunks: number }) {
           <Tag size={10} />
         </span>
       )}
-      <span className="connector" style={{ background: color, width: 8 }} />
+      <span className="connector" style={{ background: color }} />
       {anchor && <RefsPopover refs={branches} color={color} anchor={anchor} onClose={close} />}
     </>
   );
