@@ -47,13 +47,18 @@ impl OpOutcome {
     }
 }
 
+/// The 7-character abbreviation of a commit id.
+fn short_id(oid: &str) -> String {
+    oid.chars().take(7).collect()
+}
+
 /// Branch name of HEAD, or its short SHA when detached.
 fn head_label(repo: &Repository) -> Option<String> {
     let head = repo.head().ok()?;
     if head.is_branch() {
         head.shorthand().ok().map(String::from)
     } else {
-        head.target().map(|o| o.to_string()[..7].to_string())
+        head.target().map(|o| short_id(&o.to_string()))
     }
 }
 
@@ -190,12 +195,12 @@ pub fn rebase(path: &str, onto: &str) -> Result<OpOutcome> {
 
 pub fn cherry_pick(path: &str, oid: &str) -> Result<OpOutcome> {
     let branch = head_label(&super::open(path)?);
-    conflicts_as_warning(path, ops::cherry_pick(path, oid), OpOutcome::ok().from_to(Some(oid[..7.min(oid.len())].to_string()), branch))
+    conflicts_as_warning(path, ops::cherry_pick(path, oid), OpOutcome::ok().from_to(Some(short_id(oid)), branch))
 }
 
 pub fn revert(path: &str, oid: &str) -> Result<OpOutcome> {
     let branch = head_label(&super::open(path)?);
-    conflicts_as_warning(path, ops::revert(path, oid), OpOutcome::ok().from_to(Some(oid[..7.min(oid.len())].to_string()), branch))
+    conflicts_as_warning(path, ops::revert(path, oid), OpOutcome::ok().from_to(Some(short_id(oid)), branch))
 }
 
 pub fn stash_action(path: &str, action: &str, index: usize) -> Result<OpOutcome> {
@@ -208,7 +213,7 @@ pub fn commit(path: &str, message: &str, amend: bool, no_verify: bool, strip: bo
     commit::commit(path, message, amend, no_verify, strip)?;
     let repo = super::open(path)?;
     let c = repo.head()?.peel_to_commit().map_err(Error::from)?;
-    let mut o = OpOutcome::ok().from_to(branch, Some(c.id().to_string()[..7].to_string()));
+    let mut o = OpOutcome::ok().from_to(branch, Some(short_id(&c.id().to_string())));
     o.detail = c.summary().ok().flatten().unwrap_or("").to_string();
     Ok(o)
 }

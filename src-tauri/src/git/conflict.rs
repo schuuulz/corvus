@@ -50,7 +50,7 @@ pub fn versions(path: &str, file: &str) -> Result<ConflictVersions> {
 pub fn resolve(path: &str, file: &str, content: &str) -> Result<()> {
     let repo = super::open(path)?;
     let wd = super::workdir(&repo)?;
-    std::fs::write(Path::new(&wd).join(file), content)?;
+    std::fs::write(super::path_in_workdir(&wd, file)?, content)?;
     cli::run(path, &["add", "--", file]).map(|_| ())
 }
 

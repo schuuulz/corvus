@@ -103,10 +103,9 @@ pub async fn read_text_file(path: String) -> Result<String> {
 /// Writes a file inside a repository's working tree.
 #[tauri::command]
 pub async fn write_repo_file(repo: String, file: String, content: String) -> Result<()> {
-    if file.contains("..") {
-        return git::msg("invalid path");
-    }
-    system::write_text(&format!("{repo}/{file}"), &content)
+    let wd = git::workdir(&git::open(&repo)?)?;
+    let path = git::path_in_workdir(&wd, &file)?;
+    Ok(std::fs::write(path, content)?)
 }
 
 // --- ssh / gpg ---------------------------------------------------------------
