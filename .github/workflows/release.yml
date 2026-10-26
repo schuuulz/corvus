@@ -71,6 +71,8 @@ jobs:
       # Windows installers go through SignPath once it is configured
       # (docs/SIGNING.md); until then they are attached unsigned.
       SIGN_WINDOWS: ${{ matrix.name == 'windows-x64' && vars.SIGNPATH_ORGANIZATION_ID != '' }}
+      # Not dist/: that is Vite's output, so it also holds the web assets.
+      BUNDLE_DIR: release-assets
     steps:
       - uses: actions/checkout@v4
         with:
@@ -130,7 +132,7 @@ jobs:
         shell: bash
         env:
           ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
-        run: node .github/scripts/collect-installers.mjs "$ARTIFACT_PATHS" dist "${{ matrix.mac_arch }}"
+        run: node .github/scripts/collect-installers.mjs "$ARTIFACT_PATHS" "$BUNDLE_DIR" "${{ matrix.mac_arch }}"
 
       - name: Upload unsigned Windows installers
         if: env.SIGN_WINDOWS == 'true'
@@ -139,8 +141,8 @@ jobs:
         with:
           name: windows-unsigned
           path: |
-            dist/*.msi
-            dist/*-setup.exe
+            ${{ env.BUNDLE_DIR }}/*.msi
+            ${{ env.BUNDLE_DIR }}/*-setup.exe
 
       - name: Sign Windows installers (SignPath)
         if: env.SIGN_WINDOWS == 'true'
@@ -163,14 +165,14 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          cp signed/* dist/
-          for installer in dist/*-setup.exe; do
+          cp signed/* "$BUNDLE_DIR"/
+          for installer in "$BUNDLE_DIR"/*-setup.exe; do
             npx tauri signer sign "$installer"
           done
 
       - name: Attach installers to the release
         shell: bash
-        run: gh release upload "$TAG" dist/* --clobber
+        run: gh release upload "$TAG" "$BUNDLE_DIR"/* --clobber
 
   release-manifests:
     needs: [release-please, build]
