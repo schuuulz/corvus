@@ -120,6 +120,9 @@ body { background: var(--bg); color: var(--text); font: 13px/1.45 var(--font); u
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--muted); }
+/* Where both bars meet; unstyled, WebView2 paints a light square there. */
+::-webkit-scrollbar-corner { background: transparent; }
 input, textarea, select, button { font: inherit; color: inherit; }
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select {
   background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 9px; outline: none; width: 100%;
