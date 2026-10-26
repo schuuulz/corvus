@@ -514,7 +514,6 @@ export default function CommitGraph() {
         )}
         {show.colAuthor && (
           <div className="col author-col" style={{ width: widthOf("author") }}>
-            <Avatar name={row.author} email={row.email} />
             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{row.author}</span>
           </div>
         )}
