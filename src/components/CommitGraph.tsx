@@ -144,9 +144,12 @@ function Lanes({ row, width, trunks, wipLink }: { row: GraphRow; width: number; 
   const segPath = angular ? angularPath : curvedPath;
   // Main branches (trunk columns) are drawn bolder so they read as the spine
   // of the graph. Paint order: feature verticals, feature elbows, then trunk
-  // lines on top; the node last so it covers the joints.
+  // lines on top; the node last so it covers the joints. Elbows that share a
+  // stretch (several lines turning into one commit) paint farthest first, so
+  // each colour stays visible up to its own column.
   const order = (s: Seg) => (s.color < trunks ? 2 : 0) + (s.from !== s.to ? 1 : 0);
-  const sorted = [...row.segs].sort((a, b) => order(a) - order(b));
+  const reach = (s: Seg) => Math.abs(s.to - s.from);
+  const sorted = [...row.segs].sort((a, b) => order(a) - order(b) || reach(b) - reach(a));
   return (
     <svg width={width} height={ROW_H} className="lanes">
       <RowBand cx={cx} width={width} color={color} />
