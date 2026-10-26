@@ -12,14 +12,29 @@ import { Avatar, avatarColor, initials, laneColor } from "./ui";
 
 const ROW_H = 30;
 const LANE_W = 18;
+/** Spare width the graph column keeps past its last lane. */
+const GRAPH_PAD = 6;
 const x = (lane: number) => LANE_W / 2 + lane * LANE_W;
 const MID = ROW_H / 2;
+
+/** Horizontal centre of a lane, as drawn. */
+type LaneX = (lane: number) => number;
+
+/**
+ * Lane positions for a graph column `width` px wide. Lanes that don't fit
+ * fold onto the last one that does, so narrowing the column pulls them in
+ * one at a time.
+ */
+function lanesFitting(width: number): LaneX {
+  const maxLane = Math.max(0, Math.floor((width - GRAPH_PAD) / LANE_W) - 1);
+  return (lane) => x(Math.min(lane, maxLane));
+}
 
 /** Corner radius where a vertical line turns into a horizontal one. */
 const RADIUS = 6;
 
-function curvedPath(s: Seg) {
-  const x1 = x(s.from), x2 = x(s.to);
+function curvedPath(s: Seg, lx: LaneX) {
+  const x1 = lx(s.from), x2 = lx(s.to);
   if (s.half === "full") return `M${x1} 0 L${x2} ${ROW_H}`;
   if (s.half === "top") return x1 === x2 ? `M${x1} 0 L${x2} ${MID}` : `M${x1} 0 C${x1} ${MID * 0.8} ${x2} ${MID * 0.2} ${x2} ${MID}`;
   return x1 === x2 ? `M${x1} ${MID} L${x2} ${ROW_H}` : `M${x1} ${MID} C${x1} ${MID * 1.8} ${x2} ${MID * 1.2} ${x2} ${ROW_H}`;
@@ -32,8 +47,8 @@ function curvedPath(s: Seg) {
  * column and turns into the node; a merge line leaves the node sideways and
  * turns down into the merged branch's column.
  */
-function angularPath(s: Seg) {
-  const x1 = x(s.from), x2 = x(s.to);
+function angularPath(s: Seg, lx: LaneX) {
+  const x1 = lx(s.from), x2 = lx(s.to);
   if (x1 === x2) {
     if (s.half === "top") return `M${x1} 0 V${MID}`;
     if (s.half === "bottom") return `M${x1} ${MID} V${ROW_H}`;
@@ -122,6 +137,9 @@ function LabelLink({ row, cx, color }: { row: GraphRow; cx: number; color: strin
 }
 
 function Lanes({ row, width, trunks, wipLink }: { row: GraphRow; width: number; trunks: number; wipLink?: WipLink }) {
+  const lx = lanesFitting(width);
+  const cx = lx(row.lane);
+  const color = laneColor(row.color, trunks);
   const angular = useG("graphLineStyle") === "angular";
   const segPath = angular ? angularPath : curvedPath;
   // Main branches (trunk columns) are drawn bolder so they read as the spine
@@ -131,13 +149,13 @@ function Lanes({ row, width, trunks, wipLink }: { row: GraphRow; width: number; 
   const sorted = [...row.segs].sort((a, b) => order(a) - order(b));
   return (
     <svg width={width} height={ROW_H} className="lanes">
-      <RowBand cx={x(row.lane)} width={width} color={laneColor(row.color, trunks)} />
-      <LabelLink row={row} cx={x(row.lane)} color={laneColor(row.color, trunks)} />
+      <RowBand cx={cx} width={width} color={color} />
+      <LabelLink row={row} cx={cx} color={color} />
       {wipLink && <WipLine link={wipLink} />}
       {sorted.map((s, i) => (
         <path
           key={i}
-          d={segPath(s)}
+          d={segPath(s, lx)}
           stroke={laneColor(s.color, trunks)}
           strokeWidth={s.color < trunks ? 3.2 : 2}
           // Butt caps keep vertical lines seamless across row boundaries.
@@ -146,24 +164,6 @@ function Lanes({ row, width, trunks, wipLink }: { row: GraphRow; width: number; 
           fill="none"
         />
       ))}
-      <Node row={row} trunks={trunks} cx={x(row.lane)} />
-    </svg>
-  );
-}
-
-/**
- * Compact graph, for a column narrower than the full graph: every commit on
- * one line at the column centre, linked to the commits above and below.
- */
-function CompactLane({ row, width, trunks, linkUp }: { row: GraphRow; width: number; trunks: number; linkUp: boolean }) {
-  const cx = width / 2;
-  const color = laneColor(row.color, trunks);
-  return (
-    <svg width={width} height={ROW_H} className="lanes">
-      <RowBand cx={cx} width={width} color={color} />
-      <LabelLink row={row} cx={cx} color={color} />
-      {linkUp && <path d={`M${cx} 0 V${MID}`} stroke={color} strokeWidth={2} />}
-      {row.parents.length > 0 && <path d={`M${cx} ${MID} V${ROW_H}`} stroke={color} strokeWidth={2} />}
       <Node row={row} trunks={trunks} cx={cx} />
     </svg>
   );
@@ -345,12 +345,12 @@ export default function CommitGraph() {
   // The WIP node links down to HEAD across every row between them.
   const headIndex = hasWip && headRow ? rows.indexOf(headRow) : -1;
   const total = rows.length + offset;
-  const graphFit = Math.max(1, graph?.width ?? 1) * LANE_W + 6;
+  const graphFit = Math.max(1, graph?.width ?? 1) * LANE_W + GRAPH_PAD;
   const { widthOf, resize, reset } = useColumnWidths(graphFit);
   const columns = COLUMNS.filter((c) => show[c.visible]);
   const rowW = columns.reduce((sum, c) => sum + widthOf(c.id), ROW_PAD);
   const graphW = widthOf("graph");
-  const compact = graphW < graphFit;
+  const laneX = lanesFitting(graphW);
   const head = useRef<HTMLDivElement>(null);
 
   const matches = useMemo(() => {
@@ -405,7 +405,7 @@ export default function CommitGraph() {
   for (let i = first; i < last; i++) {
     if (hasWip && i === 0) {
       const sel = selection?.kind === "wip";
-      const cx = compact ? graphW / 2 : x(headRow?.lane ?? 0);
+      const cx = laneX(headRow?.lane ?? 0);
       items.push(
         <div key="wip" className={`row wip${sel ? " selected" : ""}`} style={{ top: 0, width: rowW }} onClick={() => select({ kind: "wip" })}>
           {show.colRefs && <div className="col refs-col" style={{ width: widthOf("refs") }} />}
@@ -433,7 +433,7 @@ export default function CommitGraph() {
     const dim = matches && !matches.has(row.oid);
     const tip = row.oid === tipOid;
     const wipLink: WipLink | undefined =
-      headRow && i - offset <= headIndex ? { x: x(headRow.lane), reach: i - offset < headIndex ? "through" : "into-head" } : undefined;
+      headRow && i - offset <= headIndex ? { x: laneX(headRow.lane), reach: i - offset < headIndex ? "through" : "into-head" } : undefined;
     items.push(
       <div
         key={row.oid}
@@ -457,11 +457,7 @@ export default function CommitGraph() {
         )}
         {show.colGraph && (
           <div className="col" style={{ width: graphW, padding: 0 }}>
-            {compact ? (
-              <CompactLane row={row} width={graphW} trunks={graph?.trunks ?? 0} linkUp={i > 0} />
-            ) : (
-              <Lanes row={row} width={graphW} trunks={graph?.trunks ?? 0} wipLink={wipLink} />
-            )}
+            <Lanes row={row} width={graphW} trunks={graph?.trunks ?? 0} wipLink={wipLink} />
           </div>
         )}
         {show.colMessage && (
