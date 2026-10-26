@@ -110,10 +110,14 @@ function RowBand({ cx, width, color }: { cx: number; width: number; color: strin
   );
 }
 
+/** Label connectors are faint hairlines; keep in step with `.refs-col .connector`. */
+const LINK_OPACITY = 0.35;
+
 /** Continues the branch label's connector (refs column) across the graph to the node. */
 function LabelLink({ row, cx, color }: { row: GraphRow; cx: number; color: string }) {
   if (!row.refs.length) return null;
-  return <path d={`M0 ${MID} H${cx}`} stroke={color} strokeWidth={2} />;
+  // Half a pixel down: a crisp 1px line on the same pixel row as the CSS piece.
+  return <path d={`M0 ${MID + 0.5} H${cx}`} stroke={color} strokeWidth={1} strokeOpacity={LINK_OPACITY} />;
 }
 
 function Lanes({ row, width, trunks, wipLink }: { row: GraphRow; width: number; trunks: number; wipLink?: WipLink }) {
