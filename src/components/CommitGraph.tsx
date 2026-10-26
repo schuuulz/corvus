@@ -169,6 +169,29 @@ function Lanes({ row, width, trunks, wipLink }: { row: GraphRow; width: number; 
   );
 }
 
+/** The branch a tip row stands for: the current one, else a local one, else a remote one. */
+function tipBranch(row: GraphRow): string | undefined {
+  const branches = row.refs.filter((r) => r.kind !== "tag");
+  return (branches.find((r) => r.current) ?? branches.find((r) => r.kind === "local") ?? branches[0])?.name;
+}
+
+/**
+ * The branch each commit belongs to, as the graph draws it: from a branch's
+ * tip down its first-parent line, for as long as that stays in the tip's lane.
+ */
+function branchesByCommit(rows: GraphRow[]): Map<string, string> {
+  const byOid = new Map(rows.map((r) => [r.oid, r]));
+  const owner = new Map<string, string>();
+  for (const tip of rows) {
+    const name = tipBranch(tip);
+    if (!name) continue;
+    for (let r: GraphRow | undefined = tip; r && r.lane === tip.lane && !owner.has(r.oid); r = byOid.get(r.parents[0] ?? "")) {
+      owner.set(r.oid, name);
+    }
+  }
+  return owner;
+}
+
 function Pills({ row, trunks }: { row: GraphRow; trunks: number }) {
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const close = useCallback(() => setAnchor(null), []);
@@ -361,6 +384,8 @@ export default function CommitGraph() {
     return m;
   }, [rows, search]);
 
+  const branchOf = useMemo(() => branchesByCommit(allRows), [allRows]);
+
   // Hovering a branch in the left panel marks only its latest commit (tip).
   const tipOid = useMemo(
     () => (hoverHl && hoverBranch ? rows.find((r) => r.refs.some((x) => x.name === hoverBranch && x.kind !== "tag"))?.oid ?? null : null),
@@ -453,6 +478,7 @@ export default function CommitGraph() {
         {show.colRefs && (
           <div className="col refs-col" style={{ width: widthOf("refs") }}>
             <Pills row={row} trunks={graph?.trunks ?? 0} />
+            {!row.refs.length && branchOf.has(row.oid) && <span className="branch-hint">{branchOf.get(row.oid)}</span>}
           </div>
         )}
         {show.colGraph && (
