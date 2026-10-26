@@ -191,11 +191,16 @@ impl Lanes {
             self.slots.push(Vec::new());
         }
     }
-    fn push(&mut self, i: usize, p: Pending) {
+    /// Adds a connection to column `i`. A column draws as one line in one
+    /// colour, so a connection joining a busy column takes on its colour.
+    fn push(&mut self, i: usize, (oid, color): Pending) {
         self.ensure(i);
-        if !self.slots[i].iter().any(|(o, _)| *o == p.0) {
-            self.slots[i].push(p);
+        let slot = &mut self.slots[i];
+        if slot.iter().any(|(o, _)| *o == oid) {
+            return;
         }
+        let color = slot.first().map_or(color, |(_, c)| *c);
+        slot.push((oid, color));
     }
     /// First empty column right of the trunk columns (and of `after`, when
     /// given). Trunk columns are never lent out.
@@ -462,6 +467,24 @@ mod tests {
         assert!(has(&l[3].2, 1, 0, Half::Top) && has(&l[3].2, 0, 0, Half::Top));
     }
 
+    #[test]
+    fn a_column_keeps_one_colour_until_it_empties() {
+        // Feature F2 merges trunk T2 in (other parent on the left), then F1
+        // reaches its own parent T1 further down the same column.
+        let (f2, f1, t2, t1) = (oid(4), oid(3), oid(2), oid(1));
+        let c = vec![(f2, vec![f1, t2]), (f1, vec![t1]), (t2, vec![t1]), (t1, vec![])];
+        let trunk = HashMap::from([(t2, 0), (t1, 0)]);
+        let l = layout(&c, &trunk, 1);
+        let feature = l[0].1;
+        assert_eq!(l[0].0, 1, "the feature has its own column");
+        for (row, (_, _, segs)) in l.iter().enumerate() {
+            for s in segs.iter().filter(|s| s.from == 1) {
+                assert_eq!(s.color, feature, "row {row}: {s:?}");
+            }
+        }
+        assert!(l[2].2.contains(&Seg { from: 1, to: 0, half: Half::Top, color: feature }), "the merge turns into the trunk in the feature's colour");
+    }
+
     fn raw(kind: &'static str, name: &str) -> RawRef {
         RawRef { kind, name: name.into() }
     }
@@ -520,8 +543,8 @@ mod tests {
         assert!(!l[1].2.iter().any(|s| s.from == 1 && s.to == 0), "no turn at the merge row: {:?}", l[1].2);
         assert!(has(&l[2].2, 1, 0, Half::Top), "turns left at X's row: {:?}", l[2].2);
         assert!(has(&l[2].2, 1, 1, Half::Full), "homolog keeps passing through");
-        // The turn into dev uses dev's color.
-        assert!(l[2].2.iter().any(|s| s.from == 1 && s.to == 0 && s.color == 0));
+        // The turn into dev keeps the colour of the column it comes down.
+        assert!(l[2].2.iter().any(|s| s.from == 1 && s.to == 0 && s.color == l[1].1));
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! Repository extras: git config access, Gitflow, LFS, sparse checkout,
 //! proactive conflict detection and text encodings.
 
-use super::{cli, msg, Result};
+use super::{cli, msg, operand, Result};
 use git2::BranchType;
 use serde::Serialize;
 
@@ -19,6 +19,7 @@ pub fn config_get(repo: Option<&str>, key: &str) -> String {
 
 /// Writes a config value; an empty value unsets it.
 pub fn config_set(repo: Option<&str>, key: &str, value: &str) -> Result<()> {
+    let key = operand(key)?;
     let home = crate::system::home();
     let (cwd, scope) = match repo {
         Some(r) => (r, "--local"),
@@ -128,7 +129,7 @@ pub fn gitflow_start(repo: &str, kind: &str, name: &str) -> Result<()> {
     let base = if kind == "hotfix" { &g.master } else { &g.develop };
     check_flow_branches(repo, &[base])?;
     let branch = format!("{}{name}", flow_prefix(&g, kind)?);
-    cli::run(repo, &["checkout", "-b", &branch, base]).map(|_| ())
+    cli::run(repo, &["checkout", "-b", operand(&branch)?, base]).map(|_| ())
 }
 
 /// Finishes a flow branch: features merge into develop; releases and
@@ -184,8 +185,8 @@ pub fn lfs(repo: &str) -> Lfs {
 pub fn lfs_action(repo: &str, action: &str, pattern: Option<&str>) -> Result<String> {
     match (action, pattern) {
         ("init", _) => cli::run(repo, &["lfs", "install", "--local"]),
-        ("track", Some(p)) => cli::run(repo, &["lfs", "track", p]),
-        ("untrack", Some(p)) => cli::run(repo, &["lfs", "untrack", p]),
+        ("track", Some(p)) => cli::run(repo, &["lfs", "track", operand(p)?]),
+        ("untrack", Some(p)) => cli::run(repo, &["lfs", "untrack", operand(p)?]),
         ("files", _) => cli::run(repo, &["lfs", "ls-files"]),
         _ => msg(format!("invalid lfs action {action}")),
     }
@@ -220,7 +221,9 @@ pub fn sparse_set(repo: &str, paths: &[String]) -> Result<()> {
     // An empty list keeps only root files.
     let root_only = ["/*".to_string(), "!/*/".to_string()];
     let list = if paths.iter().all(|p| p.trim().is_empty()) { &root_only[..] } else { paths };
-    args.extend(list.iter().map(|p| p.trim()).filter(|p| !p.is_empty()));
+    for p in list.iter().map(|p| p.trim()).filter(|p| !p.is_empty()) {
+        args.push(operand(p)?);
+    }
     cli::run(repo, &args).map(|_| ())
 }
 
@@ -285,7 +288,7 @@ pub fn conflict_check(repo_path: &str, patterns: &[String], preferred: Option<&s
         }
     }
     let Some((_, base)) = best else { return Ok(ConflictCheck { base: None, files: vec![] }) };
-    let (clean, out) = cli::run_status(repo_path, &["merge-tree", "--write-tree", "--name-only", "--no-messages", "HEAD", &base])?;
+    let (clean, out) = cli::run_status(repo_path, &["merge-tree", "--write-tree", "--name-only", "--no-messages", "HEAD", operand(&base)?])?;
     let files = if clean { vec![] } else { out.lines().skip(1).filter(|l| !l.is_empty()).map(String::from).collect() };
     Ok(ConflictCheck { base: Some(base), files })
 }

@@ -16,7 +16,13 @@ corvus_prompt() {
   if read -r name color < "$CORVUS_PROMPT_FILE" 2>/dev/null && [[ $name == $branch ]]; then
     rgb=$color
   fi
-  local label="%{"$'\e'"[38;2;${rgb}m%}(${branch//\%/%%})%{"$'\e'"[0m%}"
+  # Branch names may contain $(...) or backticks, which zsh runs when
+  # PROMPT_SUBST (set by oh-my-zsh and many themes) is on. PROMPT then holds a
+  # reference instead, whose expanded value is never re-evaluated.
+  typeset -g corvus_branch_label=${branch//\%/%%}
+  local name_ref=$corvus_branch_label
+  [[ -o promptsubst ]] && name_ref='${corvus_branch_label}'
+  local label="%{"$'\e'"[38;2;${rgb}m%}(${name_ref})%{"$'\e'"[0m%}"
 
   # "user@host repo % " becomes "user@host repo (main) % ".
   if [[ $CORVUS_BASE_PROMPT == *'%# ' ]]; then

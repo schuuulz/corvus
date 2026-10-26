@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, GitBranch, Settings2, Tag } from "lucide-react";
-import { GraphRow, Seg } from "../api";
+import { GraphRow, RefLabel, Seg } from "../api";
 import * as A from "../actions";
 import { commitMenu, dropBranchMenu } from "../actions";
 import RefsPopover from "./RefsPopover";
@@ -12,14 +12,29 @@ import { Avatar, avatarColor, initials, laneColor } from "./ui";
 
 const ROW_H = 30;
 const LANE_W = 18;
+/** Spare width the graph column keeps past its last lane. */
+const GRAPH_PAD = 6;
 const x = (lane: number) => LANE_W / 2 + lane * LANE_W;
 const MID = ROW_H / 2;
+
+/** Horizontal centre of a lane, as drawn. */
+type LaneX = (lane: number) => number;
+
+/**
+ * Lane positions for a graph column `width` px wide. Lanes that don't fit
+ * fold onto the last one that does, so narrowing the column pulls them in
+ * one at a time.
+ */
+function lanesFitting(width: number): LaneX {
+  const maxLane = Math.max(0, Math.floor((width - GRAPH_PAD) / LANE_W) - 1);
+  return (lane) => x(Math.min(lane, maxLane));
+}
 
 /** Corner radius where a vertical line turns into a horizontal one. */
 const RADIUS = 6;
 
-function curvedPath(s: Seg) {
-  const x1 = x(s.from), x2 = x(s.to);
+function curvedPath(s: Seg, lx: LaneX) {
+  const x1 = lx(s.from), x2 = lx(s.to);
   if (s.half === "full") return `M${x1} 0 L${x2} ${ROW_H}`;
   if (s.half === "top") return x1 === x2 ? `M${x1} 0 L${x2} ${MID}` : `M${x1} 0 C${x1} ${MID * 0.8} ${x2} ${MID * 0.2} ${x2} ${MID}`;
   return x1 === x2 ? `M${x1} ${MID} L${x2} ${ROW_H}` : `M${x1} ${MID} C${x1} ${MID * 1.8} ${x2} ${MID * 1.2} ${x2} ${ROW_H}`;
@@ -32,8 +47,8 @@ function curvedPath(s: Seg) {
  * column and turns into the node; a merge line leaves the node sideways and
  * turns down into the merged branch's column.
  */
-function angularPath(s: Seg) {
-  const x1 = x(s.from), x2 = x(s.to);
+function angularPath(s: Seg, lx: LaneX) {
+  const x1 = lx(s.from), x2 = lx(s.to);
   if (x1 === x2) {
     if (s.half === "top") return `M${x1} 0 V${MID}`;
     if (s.half === "bottom") return `M${x1} ${MID} V${ROW_H}`;
@@ -50,16 +65,15 @@ function angularPath(s: Seg) {
   return `${down} ${turnDown}`;
 }
 
-/** Commit node: the author's avatar (or initials) in a ring of the lane color, centred at `cx`. */
+/**
+ * Commit node: the author's avatar (or initials) in a ring of the lane color,
+ * centred at `cx`. A merge commit's author is whoever made the merge.
+ */
 function Node({ row, trunks, cx }: { row: GraphRow; trunks: number; cx: number }) {
   const url = useAvatar(row.email);
   const [broken, setBroken] = useState(false);
   const c = laneColor(row.color, trunks);
   const isTrunk = row.color < trunks;
-  if (row.parents.length > 1) {
-    // Merges stay small dots, so real work stands out.
-    return <circle cx={cx} cy={MID} r={isTrunk ? 5 : 4.5} fill={c} stroke="var(--bg)" strokeWidth={1.5} />;
-  }
   const r = 9;
   const clip = `av-${row.oid}`;
   return (
@@ -76,52 +90,132 @@ function Node({ row, trunks, cx }: { row: GraphRow; trunks: number; cx: number }
           {initials(row.author)}
         </text>
       )}
-      <circle cx={cx} cy={MID} r={r} fill="none" stroke={c} strokeWidth={row.isHead ? 3.5 : isTrunk ? 2.6 : 2} />
-      {row.isHead && <circle cx={cx} cy={MID} r={r + 3.5} fill="none" stroke={c} strokeOpacity={0.35} strokeWidth={2} />}
+      <circle cx={cx} cy={MID} r={r} fill="none" stroke={c} strokeWidth={row.isHead ? 2 : isTrunk ? 1.5 : 1.2} />
+      {row.isHead && <circle cx={cx} cy={MID} r={r + 3.5} fill="none" stroke={c} strokeOpacity={0.35} strokeWidth={1.5} />}
     </g>
   );
 }
 
-function Lanes({ row, width, trunks }: { row: GraphRow; width: number; trunks: number }) {
+/** How the dashed line from the WIP node down to HEAD crosses a row. */
+type WipLink = { x: number; reach: "through" | "into-head" };
+
+/** Dashes and gaps of the WIP line, in px; rows are a whole number of periods tall. */
+const WIP_DASH = 3;
+
+function WipLine({ link }: { link: WipLink }) {
+  const end = link.reach === "through" ? ROW_H : MID;
+  return <path d={`M${link.x} 0 V${end}`} stroke="var(--muted)" strokeDasharray={`${WIP_DASH} ${WIP_DASH}`} strokeWidth={2} />;
+}
+
+/** Gap kept above and below a row's band, so rows read as separate strips. */
+const BAND_GAP = 2;
+const BAR_W = 3;
+
+/**
+ * The row's band: from the node to the edge of the graph cell, tinted in the
+ * lane colour and closed by a solid bar where the message column starts.
+ * Faded until the row is selected (`.row-band` in App.css).
+ */
+function RowBand({ cx, width, color }: { cx: number; width: number; color: string }) {
+  const h = ROW_H - 2 * BAND_GAP;
+  return (
+    <g className="row-band">
+      <rect x={cx} y={BAND_GAP} width={Math.max(0, width - cx)} height={h} fill={color} fillOpacity={0.2} />
+      <rect x={width - BAR_W} y={BAND_GAP} width={BAR_W} height={h} fill={color} />
+    </g>
+  );
+}
+
+/** Label connectors are faint hairlines; keep in step with `.refs-col .connector`. */
+const LINK_OPACITY = 0.35;
+
+/** Continues the branch label's connector (refs column) across the graph to the node. */
+function LabelLink({ row, cx, color }: { row: GraphRow; cx: number; color: string }) {
+  if (!row.refs.length) return null;
+  // Half a pixel down: a crisp 1px line on the same pixel row as the CSS piece.
+  return <path d={`M0 ${MID + 0.5} H${cx}`} stroke={color} strokeWidth={1} strokeOpacity={LINK_OPACITY} />;
+}
+
+function Lanes({ row, width, trunks, wipLink }: { row: GraphRow; width: number; trunks: number; wipLink?: WipLink }) {
+  const lx = lanesFitting(width);
+  const cx = lx(row.lane);
+  const color = laneColor(row.color, trunks);
   const angular = useG("graphLineStyle") === "angular";
   const segPath = angular ? angularPath : curvedPath;
   // Main branches (trunk columns) are drawn bolder so they read as the spine
   // of the graph. Paint order: feature verticals, feature elbows, then trunk
-  // lines on top; the node last so it covers the joints.
+  // lines on top; the node last so it covers the joints. Elbows that share a
+  // stretch (several lines turning into one commit) paint farthest first, so
+  // each colour stays visible up to its own column.
   const order = (s: Seg) => (s.color < trunks ? 2 : 0) + (s.from !== s.to ? 1 : 0);
-  const sorted = [...row.segs].sort((a, b) => order(a) - order(b));
+  const reach = (s: Seg) => Math.abs(s.to - s.from);
+  const sorted = [...row.segs].sort((a, b) => order(a) - order(b) || reach(b) - reach(a));
   return (
     <svg width={width} height={ROW_H} className="lanes">
+      <RowBand cx={cx} width={width} color={color} />
+      <LabelLink row={row} cx={cx} color={color} />
+      {wipLink && <WipLine link={wipLink} />}
       {sorted.map((s, i) => (
         <path
           key={i}
-          d={segPath(s)}
+          d={segPath(s, lx)}
           stroke={laneColor(s.color, trunks)}
-          strokeWidth={s.color < trunks ? 3.2 : 2}
+          strokeWidth={s.color < trunks ? 2.4 : 1.6}
           // Butt caps keep vertical lines seamless across row boundaries.
           strokeLinecap={angular ? "butt" : "round"}
           strokeLinejoin="round"
           fill="none"
         />
       ))}
-      <Node row={row} trunks={trunks} cx={x(row.lane)} />
+      <Node row={row} trunks={trunks} cx={cx} />
     </svg>
   );
 }
 
+/** The branch a tip row stands for: the current one, else a local one, else a remote one. */
+function tipBranch(row: GraphRow): RefLabel | undefined {
+  const branches = row.refs.filter((r) => r.kind !== "tag");
+  return branches.find((r) => r.current) ?? branches.find((r) => r.kind === "local") ?? branches[0];
+}
+
 /**
- * Compact graph, for a column narrower than the full graph: every commit on
- * one line at the column centre, linked to the commits above and below.
+ * The branch each commit belongs to, as the graph draws it: from a branch's
+ * tip down its first-parent line, for as long as that stays in the tip's lane.
  */
-function CompactLane({ row, width, trunks, linkUp }: { row: GraphRow; width: number; trunks: number; linkUp: boolean }) {
-  const cx = width / 2;
+function branchesByCommit(rows: GraphRow[]): Map<string, RefLabel> {
+  const byOid = new Map(rows.map((r) => [r.oid, r]));
+  const owner = new Map<string, RefLabel>();
+  for (const tip of rows) {
+    const branch = tipBranch(tip);
+    if (!branch) continue;
+    for (let r: GraphRow | undefined = tip; r && r.lane === tip.lane && !owner.has(r.oid); r = byOid.get(r.parents[0] ?? "")) {
+      owner.set(r.oid, branch);
+    }
+  }
+  return owner;
+}
+
+/** What a branch label shows: the commit's author, the branch name and where it lives. */
+function PillContent({ row, r, showCurrent }: { row: GraphRow; r: RefLabel; showCurrent: boolean }) {
+  return (
+    <>
+      <Avatar name={row.author} email={row.email} size="xs" />
+      {showCurrent && r.current && <Check size={11} strokeWidth={3} />}
+      <span className="pill-name">{r.name}</span>
+      <span className="pill-locs">
+        <RefIcons r={r} lead={false} size={10} />
+      </span>
+    </>
+  );
+}
+
+/** A faded label, shown on hover, naming the branch an unlabelled commit belongs to. */
+function BranchHint({ row, r, trunks }: { row: GraphRow; r: RefLabel; trunks: number }) {
   const color = laneColor(row.color, trunks);
   return (
-    <svg width={width} height={ROW_H} className="lanes">
-      {linkUp && <path d={`M${cx} 0 V${MID}`} stroke={color} strokeWidth={2} />}
-      {row.parents.length > 0 && <path d={`M${cx} ${MID} V${ROW_H}`} stroke={color} strokeWidth={2} />}
-      <Node row={row} trunks={trunks} cx={cx} />
-    </svg>
+    <span className={`pill ${r.kind} branch-hint`} style={{ background: color, color: r.kind === "remote" ? color : undefined }}>
+      <PillContent row={row} r={r} showCurrent={false} />
+    </span>
   );
 }
 
@@ -166,12 +260,7 @@ function Pills({ row, trunks }: { row: GraphRow; trunks: number }) {
             title={`${r.name} · ${refWhere(r)}\nLast commit by ${row.author}${r.current ? "\nCurrent branch" : "\nDouble-click to switch"}`}
           >
             {/* The label sits on the branch tip, so this is its latest author. */}
-            <Avatar name={row.author} email={row.email} size="xs" />
-            {r.current && <Check size={11} strokeWidth={3} />}
-            <span className="pill-name">{r.name}</span>
-            <span className="pill-locs">
-              <RefIcons r={r} lead={false} size={10} />
-            </span>
+            <PillContent row={row} r={r} showCurrent />
           </span>
         ),
       )}
@@ -195,7 +284,7 @@ function Pills({ row, trunks }: { row: GraphRow; trunks: number }) {
           <Tag size={10} />
         </span>
       )}
-      <span className="connector" style={{ background: color, width: 8 }} />
+      <span className="connector" style={{ background: color }} />
       {anchor && <RefsPopover refs={branches} color={color} anchor={anchor} onClose={close} />}
     </>
   );
@@ -298,13 +387,15 @@ export default function CommitGraph() {
   }, [allRows, visibility]);
 
   const offset = hasWip ? 1 : 0;
+  // The WIP node links down to HEAD across every row between them.
+  const headIndex = hasWip && headRow ? rows.indexOf(headRow) : -1;
   const total = rows.length + offset;
-  const graphFit = Math.max(1, graph?.width ?? 1) * LANE_W + 6;
+  const graphFit = Math.max(1, graph?.width ?? 1) * LANE_W + GRAPH_PAD;
   const { widthOf, resize, reset } = useColumnWidths(graphFit);
   const columns = COLUMNS.filter((c) => show[c.visible]);
   const rowW = columns.reduce((sum, c) => sum + widthOf(c.id), ROW_PAD);
   const graphW = widthOf("graph");
-  const compact = graphW < graphFit;
+  const laneX = lanesFitting(graphW);
   const head = useRef<HTMLDivElement>(null);
 
   const matches = useMemo(() => {
@@ -314,6 +405,8 @@ export default function CommitGraph() {
       if (r.summary.toLowerCase().includes(search) || r.author.toLowerCase().includes(search) || r.oid.startsWith(search)) m.add(r.oid);
     return m;
   }, [rows, search]);
+
+  const branchOf = useMemo(() => branchesByCommit(allRows), [allRows]);
 
   // Hovering a branch in the left panel marks only its latest commit (tip).
   const tipOid = useMemo(
@@ -359,14 +452,17 @@ export default function CommitGraph() {
   for (let i = first; i < last; i++) {
     if (hasWip && i === 0) {
       const sel = selection?.kind === "wip";
-      const cx = compact ? graphW / 2 : x(headRow?.lane ?? 0);
+      const cx = laneX(headRow?.lane ?? 0);
       items.push(
         <div key="wip" className={`row wip${sel ? " selected" : ""}`} style={{ top: 0, width: rowW }} onClick={() => select({ kind: "wip" })}>
           {show.colRefs && <div className="col refs-col" style={{ width: widthOf("refs") }} />}
           {show.colGraph && (
             <div className="col" style={{ width: graphW, padding: 0 }}>
               <svg width={graphW} height={ROW_H} className="lanes">
-                {headRow && <path d={`M${cx} ${MID} L${cx} ${ROW_H}`} stroke="var(--muted)" strokeDasharray="3 3" strokeWidth={2} />}
+                {headRow && (
+                  // Offset so the dashes line up with the rows below, which start theirs at 0.
+                  <path d={`M${cx} ${MID} L${cx} ${ROW_H}`} stroke="var(--muted)" strokeDasharray={`${WIP_DASH} ${WIP_DASH}`} strokeDashoffset={MID % (2 * WIP_DASH)} strokeWidth={2} />
+                )}
                 <circle cx={cx} cy={MID} r={8} fill="var(--bg)" stroke="var(--muted)" strokeDasharray="3 2" strokeWidth={2} />
               </svg>
             </div>
@@ -383,11 +479,14 @@ export default function CommitGraph() {
     const sel = selection?.kind === "commit" && selection.oid === row.oid;
     const dim = matches && !matches.has(row.oid);
     const tip = row.oid === tipOid;
+    const hint = branchOf.get(row.oid);
+    const wipLink: WipLink | undefined =
+      headRow && i - offset <= headIndex ? { x: laneX(headRow.lane), reach: i - offset < headIndex ? "through" : "into-head" } : undefined;
     items.push(
       <div
         key={row.oid}
         className={`row${sel ? " selected" : ""}${dim ? " dim" : ""}${tip ? " hl-tip" : ""}${row.isHead ? " head" : ""}`}
-        style={{ top: i * ROW_H, width: rowW, ...(tip ? { "--branch": laneColor(row.color, graph?.trunks ?? 0) } : {}) } as React.CSSProperties}
+        style={{ top: i * ROW_H, width: rowW, "--branch": laneColor(row.color, graph?.trunks ?? 0) } as React.CSSProperties}
         onClick={() => select({ kind: "commit", oid: row.oid })}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -402,15 +501,12 @@ export default function CommitGraph() {
         {show.colRefs && (
           <div className="col refs-col" style={{ width: widthOf("refs") }}>
             <Pills row={row} trunks={graph?.trunks ?? 0} />
+            {!row.refs.length && hint && <BranchHint row={row} r={hint} trunks={graph?.trunks ?? 0} />}
           </div>
         )}
         {show.colGraph && (
           <div className="col" style={{ width: graphW, padding: 0 }}>
-            {compact ? (
-              <CompactLane row={row} width={graphW} trunks={graph?.trunks ?? 0} linkUp={i > 0} />
-            ) : (
-              <Lanes row={row} width={graphFit} trunks={graph?.trunks ?? 0} />
-            )}
+            <Lanes row={row} width={graphW} trunks={graph?.trunks ?? 0} wipLink={wipLink} />
           </div>
         )}
         {show.colMessage && (
@@ -421,7 +517,6 @@ export default function CommitGraph() {
         )}
         {show.colAuthor && (
           <div className="col author-col" style={{ width: widthOf("author") }}>
-            <Avatar name={row.author} email={row.email} />
             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{row.author}</span>
           </div>
         )}

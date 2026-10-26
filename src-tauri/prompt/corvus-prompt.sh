@@ -18,7 +18,15 @@ else
   if read -r corvus_name corvus_color < "$CORVUS_PROMPT_FILE" 2>/dev/null && [ "$corvus_name" = "$corvus_branch" ]; then
     corvus_rgb=$corvus_color
   fi
-  corvus_label="\[\e[38;2;${corvus_rgb}m\](${corvus_branch})\[\e[0m\]"
+  # Branch names may contain $(...) or backticks, which bash would run if they
+  # were part of PS1. With promptvars on, PS1 holds a reference instead, whose
+  # expanded value is never re-evaluated; without it nothing is expanded.
+  if shopt -q promptvars; then
+    corvus_name_ref='${corvus_branch}'
+  else
+    corvus_name_ref=$corvus_branch
+  fi
+  corvus_label="\[\e[38;2;${corvus_rgb}m\](${corvus_name_ref})\[\e[0m\]"
 
   # "user@host:~/repo$ " becomes "user@host:~/repo (main) $ ".
   case $CORVUS_BASE_PS1 in
