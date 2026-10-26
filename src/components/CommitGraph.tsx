@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, GitBranch, Settings2, Tag } from "lucide-react";
-import { GraphRow, Seg } from "../api";
+import { GraphRow, RefLabel, Seg } from "../api";
 import * as A from "../actions";
 import { commitMenu, dropBranchMenu } from "../actions";
 import RefsPopover from "./RefsPopover";
@@ -170,26 +170,50 @@ function Lanes({ row, width, trunks, wipLink }: { row: GraphRow; width: number; 
 }
 
 /** The branch a tip row stands for: the current one, else a local one, else a remote one. */
-function tipBranch(row: GraphRow): string | undefined {
+function tipBranch(row: GraphRow): RefLabel | undefined {
   const branches = row.refs.filter((r) => r.kind !== "tag");
-  return (branches.find((r) => r.current) ?? branches.find((r) => r.kind === "local") ?? branches[0])?.name;
+  return branches.find((r) => r.current) ?? branches.find((r) => r.kind === "local") ?? branches[0];
 }
 
 /**
  * The branch each commit belongs to, as the graph draws it: from a branch's
  * tip down its first-parent line, for as long as that stays in the tip's lane.
  */
-function branchesByCommit(rows: GraphRow[]): Map<string, string> {
+function branchesByCommit(rows: GraphRow[]): Map<string, RefLabel> {
   const byOid = new Map(rows.map((r) => [r.oid, r]));
-  const owner = new Map<string, string>();
+  const owner = new Map<string, RefLabel>();
   for (const tip of rows) {
-    const name = tipBranch(tip);
-    if (!name) continue;
+    const branch = tipBranch(tip);
+    if (!branch) continue;
     for (let r: GraphRow | undefined = tip; r && r.lane === tip.lane && !owner.has(r.oid); r = byOid.get(r.parents[0] ?? "")) {
-      owner.set(r.oid, name);
+      owner.set(r.oid, branch);
     }
   }
   return owner;
+}
+
+/** What a branch label shows: the commit's author, the branch name and where it lives. */
+function PillContent({ row, r, showCurrent }: { row: GraphRow; r: RefLabel; showCurrent: boolean }) {
+  return (
+    <>
+      <Avatar name={row.author} email={row.email} size="xs" />
+      {showCurrent && r.current && <Check size={11} strokeWidth={3} />}
+      <span className="pill-name">{r.name}</span>
+      <span className="pill-locs">
+        <RefIcons r={r} lead={false} size={10} />
+      </span>
+    </>
+  );
+}
+
+/** A faded label, shown on hover, naming the branch an unlabelled commit belongs to. */
+function BranchHint({ row, r, trunks }: { row: GraphRow; r: RefLabel; trunks: number }) {
+  const color = laneColor(row.color, trunks);
+  return (
+    <span className={`pill ${r.kind} branch-hint`} style={{ background: color, color: r.kind === "remote" ? color : undefined }}>
+      <PillContent row={row} r={r} showCurrent={false} />
+    </span>
+  );
 }
 
 function Pills({ row, trunks }: { row: GraphRow; trunks: number }) {
@@ -233,12 +257,7 @@ function Pills({ row, trunks }: { row: GraphRow; trunks: number }) {
             title={`${r.name} · ${refWhere(r)}\nLast commit by ${row.author}${r.current ? "\nCurrent branch" : "\nDouble-click to switch"}`}
           >
             {/* The label sits on the branch tip, so this is its latest author. */}
-            <Avatar name={row.author} email={row.email} size="xs" />
-            {r.current && <Check size={11} strokeWidth={3} />}
-            <span className="pill-name">{r.name}</span>
-            <span className="pill-locs">
-              <RefIcons r={r} lead={false} size={10} />
-            </span>
+            <PillContent row={row} r={r} showCurrent />
           </span>
         ),
       )}
@@ -457,6 +476,7 @@ export default function CommitGraph() {
     const sel = selection?.kind === "commit" && selection.oid === row.oid;
     const dim = matches && !matches.has(row.oid);
     const tip = row.oid === tipOid;
+    const hint = branchOf.get(row.oid);
     const wipLink: WipLink | undefined =
       headRow && i - offset <= headIndex ? { x: laneX(headRow.lane), reach: i - offset < headIndex ? "through" : "into-head" } : undefined;
     items.push(
@@ -478,7 +498,7 @@ export default function CommitGraph() {
         {show.colRefs && (
           <div className="col refs-col" style={{ width: widthOf("refs") }}>
             <Pills row={row} trunks={graph?.trunks ?? 0} />
-            {!row.refs.length && branchOf.has(row.oid) && <span className="branch-hint">{branchOf.get(row.oid)}</span>}
+            {!row.refs.length && hint && <BranchHint row={row} r={hint} trunks={graph?.trunks ?? 0} />}
           </div>
         )}
         {show.colGraph && (

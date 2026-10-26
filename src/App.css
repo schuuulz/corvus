@@ -303,8 +303,8 @@ button.primary { font-weight: 600; letter-spacing: 0.2px; }
 /* Labels sit at the left; the connector fills the rest of the column,
    through its right padding, and LabelLink carries it on to the node. */
 /* On hover, an unlabelled commit hints the branch it belongs to. */
-.branch-hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--muted); opacity: 0; transition: opacity var(--ease); }
-.row:hover .branch-hint { opacity: 0.55; }
+.branch-hint { opacity: 0; pointer-events: none; transition: opacity var(--ease); }
+.row:hover .branch-hint { opacity: 0.35; }
 .refs-col .connector { flex: 1; min-width: 8px; margin-right: -8px; height: 1px; opacity: 0.35; }
 .lanes { flex: none; overflow: visible; }
 .row-band { opacity: 0.4; transition: opacity var(--ease); }
