@@ -1,6 +1,6 @@
 [package]
 name = "corvus"
-version = "0.4.0"
+version = "0.4.1"
 description = "Corvus: a Git GUI client"
 authors = ["Corvus"]
 license = "MIT"
