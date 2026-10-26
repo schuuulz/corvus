@@ -92,6 +92,12 @@ function WipLine({ link }: { link: WipLink }) {
   return <path d={`M${link.x} 0 V${end}`} stroke="var(--muted)" strokeDasharray={`${WIP_DASH} ${WIP_DASH}`} strokeWidth={2} />;
 }
 
+/** Continues the branch label's connector (refs column) across the graph to the node. */
+function LabelLink({ row, cx, color }: { row: GraphRow; cx: number; color: string }) {
+  if (!row.refs.length) return null;
+  return <path d={`M0 ${MID} H${cx}`} stroke={color} strokeWidth={2} />;
+}
+
 function Lanes({ row, width, trunks, wipLink }: { row: GraphRow; width: number; trunks: number; wipLink?: WipLink }) {
   const angular = useG("graphLineStyle") === "angular";
   const segPath = angular ? angularPath : curvedPath;
@@ -102,6 +108,7 @@ function Lanes({ row, width, trunks, wipLink }: { row: GraphRow; width: number; 
   const sorted = [...row.segs].sort((a, b) => order(a) - order(b));
   return (
     <svg width={width} height={ROW_H} className="lanes">
+      <LabelLink row={row} cx={x(row.lane)} color={laneColor(row.color, trunks)} />
       {wipLink && <WipLine link={wipLink} />}
       {sorted.map((s, i) => (
         <path
@@ -129,6 +136,7 @@ function CompactLane({ row, width, trunks, linkUp }: { row: GraphRow; width: num
   const color = laneColor(row.color, trunks);
   return (
     <svg width={width} height={ROW_H} className="lanes">
+      <LabelLink row={row} cx={cx} color={color} />
       {linkUp && <path d={`M${cx} 0 V${MID}`} stroke={color} strokeWidth={2} />}
       {row.parents.length > 0 && <path d={`M${cx} ${MID} V${ROW_H}`} stroke={color} strokeWidth={2} />}
       <Node row={row} trunks={trunks} cx={cx} />
