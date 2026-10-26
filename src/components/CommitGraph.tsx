@@ -81,7 +81,18 @@ function Node({ row, trunks, cx }: { row: GraphRow; trunks: number; cx: number }
   );
 }
 
-function Lanes({ row, width, trunks }: { row: GraphRow; width: number; trunks: number }) {
+/** How the dashed line from the WIP node down to HEAD crosses a row. */
+type WipLink = { x: number; reach: "through" | "into-head" };
+
+/** Dashes and gaps of the WIP line, in px; rows are a whole number of periods tall. */
+const WIP_DASH = 3;
+
+function WipLine({ link }: { link: WipLink }) {
+  const end = link.reach === "through" ? ROW_H : MID;
+  return <path d={`M${link.x} 0 V${end}`} stroke="var(--muted)" strokeDasharray={`${WIP_DASH} ${WIP_DASH}`} strokeWidth={2} />;
+}
+
+function Lanes({ row, width, trunks, wipLink }: { row: GraphRow; width: number; trunks: number; wipLink?: WipLink }) {
   const angular = useG("graphLineStyle") === "angular";
   const segPath = angular ? angularPath : curvedPath;
   // Main branches (trunk columns) are drawn bolder so they read as the spine
@@ -91,6 +102,7 @@ function Lanes({ row, width, trunks }: { row: GraphRow; width: number; trunks: n
   const sorted = [...row.segs].sort((a, b) => order(a) - order(b));
   return (
     <svg width={width} height={ROW_H} className="lanes">
+      {wipLink && <WipLine link={wipLink} />}
       {sorted.map((s, i) => (
         <path
           key={i}
@@ -297,6 +309,8 @@ export default function CommitGraph() {
   }, [allRows, visibility]);
 
   const offset = hasWip ? 1 : 0;
+  // The WIP node links down to HEAD across every row between them.
+  const headIndex = hasWip && headRow ? rows.indexOf(headRow) : -1;
   const total = rows.length + offset;
   const graphFit = Math.max(1, graph?.width ?? 1) * LANE_W + 6;
   const { widthOf, resize, reset } = useColumnWidths(graphFit);
@@ -365,7 +379,10 @@ export default function CommitGraph() {
           {show.colGraph && (
             <div className="col" style={{ width: graphW, padding: 0 }}>
               <svg width={graphW} height={ROW_H} className="lanes">
-                {headRow && <path d={`M${cx} ${MID} L${cx} ${ROW_H}`} stroke="var(--muted)" strokeDasharray="3 3" strokeWidth={2} />}
+                {headRow && (
+                  // Offset so the dashes line up with the rows below, which start theirs at 0.
+                  <path d={`M${cx} ${MID} L${cx} ${ROW_H}`} stroke="var(--muted)" strokeDasharray={`${WIP_DASH} ${WIP_DASH}`} strokeDashoffset={MID % (2 * WIP_DASH)} strokeWidth={2} />
+                )}
                 <circle cx={cx} cy={MID} r={8} fill="var(--bg)" stroke="var(--muted)" strokeDasharray="3 2" strokeWidth={2} />
               </svg>
             </div>
@@ -382,6 +399,8 @@ export default function CommitGraph() {
     const sel = selection?.kind === "commit" && selection.oid === row.oid;
     const dim = matches && !matches.has(row.oid);
     const tip = row.oid === tipOid;
+    const wipLink: WipLink | undefined =
+      headRow && i - offset <= headIndex ? { x: x(headRow.lane), reach: i - offset < headIndex ? "through" : "into-head" } : undefined;
     items.push(
       <div
         key={row.oid}
@@ -408,7 +427,7 @@ export default function CommitGraph() {
             {compact ? (
               <CompactLane row={row} width={graphW} trunks={graph?.trunks ?? 0} linkUp={i > 0} />
             ) : (
-              <Lanes row={row} width={graphFit} trunks={graph?.trunks ?? 0} />
+              <Lanes row={row} width={graphFit} trunks={graph?.trunks ?? 0} wipLink={wipLink} />
             )}
           </div>
         )}
