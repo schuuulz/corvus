@@ -294,11 +294,7 @@ button.primary { font-weight: 600; letter-spacing: 0.2px; }
 /* Hover and the branch-tip mark are painted by a layer that starts at the
    message column (--row-start), leaving Branch/Tag and Graph untouched. */
 .row { isolation: isolate; }
-/* Same look as a hovered branch in the left panel (.ref-item): an inset,
-   rounded band and brighter text. */
-.row::before { content: ""; position: absolute; top: 0; bottom: 0; left: calc(var(--row-start, 0px) + 6px); right: 6px; z-index: -1; pointer-events: none; border-radius: var(--radius-sm); transition: background var(--ease); }
-.row:hover::before { background: var(--hover); }
-.row:hover .author-col { color: var(--text); }
+.row::before { content: ""; position: absolute; top: 0; bottom: 0; left: var(--row-start, 0); right: 0; z-index: -1; pointer-events: none; transition: background var(--ease); }
 .row.selected { background: var(--sel); }
 .row.dim { opacity: 0.32; }
 .row.head .msg-sum { font-weight: 600; }
@@ -687,12 +683,14 @@ input.invalid, .gf-name.invalid { border-color: var(--danger) !important; box-sh
 .gf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
 .gf-init > button { align-self: flex-start; }
 @media (max-width: 720px) { .gf-cards { grid-template-columns: 1fr; } }
-/* Hovering a branch in the left panel marks its latest commit (tip). */
+/* A hovered row, and the tip a hovered branch in the left panel marks,
+   share one look: a band tinted with the row's lane colour (--branch). */
+.row:hover::before,
 .row.hl-tip::before {
   background: color-mix(in srgb, var(--branch, var(--accent)) 20%, transparent);
   box-shadow: inset 3px 0 0 var(--branch, var(--accent));
-  animation: tip-in 160ms ease-out;
 }
+.row.hl-tip::before { animation: tip-in 160ms ease-out; }
 .row.hl-tip .msg-sum { font-weight: 600; }
 @keyframes tip-in { from { opacity: 0; } }
 

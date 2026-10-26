@@ -387,7 +387,7 @@ export default function CommitGraph() {
       <div
         key={row.oid}
         className={`row${sel ? " selected" : ""}${dim ? " dim" : ""}${tip ? " hl-tip" : ""}${row.isHead ? " head" : ""}`}
-        style={{ top: i * ROW_H, width: rowW, ...(tip ? { "--branch": laneColor(row.color, graph?.trunks ?? 0) } : {}) } as React.CSSProperties}
+        style={{ top: i * ROW_H, width: rowW, "--branch": laneColor(row.color, graph?.trunks ?? 0) } as React.CSSProperties}
         onClick={() => select({ kind: "commit", oid: row.oid })}
         onContextMenu={(e) => {
           e.preventDefault();
