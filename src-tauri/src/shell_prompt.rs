@@ -204,28 +204,99 @@ mod tests {
         assert!(fish.get_env("PROMPT_COMMAND").is_none() && fish.get_env("ZDOTDIR").is_none());
     }
 
-    /// Runs the bash script against a throwaway repo. Unix only: on Windows
-    /// `bash` may resolve to WSL, which can't see Windows paths.
+    /// A branch name that creates `pwned*` files if any shell evaluates it.
+    const HOSTILE_BRANCH: &str = "x$(touch${IFS}pwned1)`touch${IFS}pwned2`&type>pwned3|\"&type>pwned4\"%PATH%";
+
+    /// A throwaway repo on `branch`, plus a prompt dir with the scripts and a
+    /// head file colouring that branch violet.
+    fn prompt_fixture(branch: &str) -> (tempfile::TempDir, String, tempfile::TempDir) {
+        let repo = tempfile::tempdir().unwrap();
+        let path = repo.path().to_string_lossy().replace('\\', "/");
+        let ok = std::process::Command::new("git").current_dir(&path).args(["init", "-q", "-b", branch]).status().unwrap();
+        assert!(ok.success());
+        let dir = tempfile::tempdir().unwrap();
+        install(dir.path()).unwrap();
+        write_head(dir.path(), &path, branch, "#8B5CF6").unwrap();
+        (repo, path, dir)
+    }
+
+    fn assert_nothing_ran(repo: &Path) {
+        let created: Vec<_> = fs::read_dir(repo).unwrap().filter_map(|e| e.ok()).map(|e| e.file_name()).filter(|n| n != ".git").collect();
+        assert!(created.is_empty(), "the branch name ran as a command: {created:?}");
+    }
+
+    /// Runs `body` in bash, in `path`, with the prompt script sourced. Unix
+    /// only: on Windows `bash` may resolve to WSL, which can't see Windows paths.
+    #[cfg(unix)]
+    fn run_bash_prompt(path: &str, dir: &Path, body: &str) -> String {
+        let script = format!(
+            "cd '{path}'; PS1='\\w\\$ '; CORVUS_PROMPT_FILE='{}'; false; . '{}'; {body}",
+            forward_slashes(&head_file(dir, path)),
+            forward_slashes(&dir.join(SH_SCRIPT)),
+        );
+        let out = std::process::Command::new("bash").args(["--noprofile", "--norc", "-c", &script]).output().unwrap();
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    }
+
     #[cfg(unix)]
     #[test]
     fn bash_prompt_shows_the_branch_in_its_colour() {
-        use std::process::Command;
-
-        let repo = tempfile::tempdir().unwrap();
-        let path = repo.path().to_string_lossy().replace('\\', "/");
-        let git = |args: &[&str]| assert!(Command::new("git").current_dir(&path).args(args).status().unwrap().success());
-        git(&["init", "-q", "-b", "feat/x"]);
-        let dir = tempfile::tempdir().unwrap();
-        install(dir.path()).unwrap();
-        write_head(dir.path(), &path, "feat/x", "#8B5CF6").unwrap();
-
-        let script = format!(
-            "cd '{path}'; PS1='\\w\\$ '; CORVUS_PROMPT_FILE='{}'; false; . '{}'; status=$?; printf '%s|%s' \"$status\" \"$PS1\"",
-            forward_slashes(&head_file(dir.path(), &path)),
-            forward_slashes(&dir.path().join(SH_SCRIPT)),
+        let (_repo, path, dir) = prompt_fixture("feat/x");
+        let shown = run_bash_prompt(&path, dir.path(), "status=$?; printf '%s|%s|%s' \"$status\" \"$PS1\" \"$corvus_branch\"");
+        assert_eq!(
+            shown,
+            "1|\\w \\[\\e[38;2;139;92;246m\\](${corvus_branch})\\[\\e[0m\\] \\$ |feat/x",
+            "keeps $? and inserts the branch"
         );
-        let out = Command::new("bash").args(["--noprofile", "--norc", "-c", &script]).output().unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bash_prompt_never_runs_the_branch_name() {
+        let (repo, path, dir) = prompt_fixture(HOSTILE_BRANCH);
+        let shown = run_bash_prompt(&path, dir.path(), "printf '%s' \"${PS1@P}\"");
+        assert!(shown.contains(&format!("({HOSTILE_BRANCH})")), "shows the name verbatim: {shown}");
+        assert_nothing_ran(repo.path());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn zsh_prompt_never_runs_the_branch_name() {
+        use std::process::Command;
+        if Command::new("zsh").arg("-fc").arg("true").status().is_err() {
+            return;
+        }
+        let (repo, path, dir) = prompt_fixture(HOSTILE_BRANCH);
+        let user = tempfile::tempdir().unwrap();
+        // `${(%)${(e)PROMPT}}` expands the prompt as PROMPT_SUBST would.
+        let script = format!(
+            "cd '{path}'; setopt promptsubst; PROMPT='%# '; CORVUS_USER_ZDOTDIR='{}'; CORVUS_PROMPT_FILE='{}'; \
+             source '{}'; corvus_prompt; print -rn -- ${{(%)${{(e)PROMPT}}}}",
+            user.path().display(),
+            head_file(dir.path(), &path).display(),
+            dir.path().join("zsh/.zshrc").display(),
+        );
+        let out = Command::new("zsh").args(["-f", "-c", &script]).output().unwrap();
         let shown = String::from_utf8_lossy(&out.stdout);
-        assert_eq!(shown, "1|\\w \\[\\e[38;2;139;92;246m\\](feat/x)\\[\\e[0m\\] \\$ ", "keeps $? and inserts the branch");
+        assert!(shown.contains(&format!("({HOSTILE_BRANCH})")), "shows the name verbatim: {shown}");
+        assert_nothing_ran(repo.path());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cmd_prompt_never_runs_the_branch_name() {
+        use std::process::Command;
+        let (repo, path, dir) = prompt_fixture(HOSTILE_BRANCH);
+        let out = Command::new("cmd")
+            .current_dir(&path)
+            .env("CORVUS_PROMPT_FILE", head_file(dir.path(), &path))
+            .env("CORVUS_PROMPT_SCRIPT", format!("\"{}\"", dir.path().join(CMD_SCRIPT).display()))
+            .args(["/d", "/c", "call", "%CORVUS_PROMPT_SCRIPT%", "&", "set", "PROMPT"])
+            .output()
+            .unwrap();
+        let shown = String::from_utf8_lossy(&out.stdout);
+        let expected = "PROMPT=$P $E[38;2;139;92;246m(x$$(touch$${IFS}pwned1)`touch$${IFS}pwned2`$Atype$Gpwned3$B\"$Atype$Gpwned4\"%PATH%)$E[0m$G";
+        assert_eq!(shown.trim(), expected, "spells the name with prompt codes, in its colour");
+        assert_nothing_ran(repo.path());
     }
 }

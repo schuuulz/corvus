@@ -94,10 +94,6 @@ pub fn read_text(path: &str) -> Result<String> {
     Ok(std::fs::read_to_string(path)?)
 }
 
-pub fn write_text(path: &str, content: &str) -> Result<()> {
-    Ok(std::fs::write(path, content)?)
-}
-
 // --- GPG -------------------------------------------------------------------
 
 #[derive(Serialize)]
@@ -207,6 +203,12 @@ pub fn open_in_editor(tool_path: &str, target: &str) -> Result<()> {
 }
 
 pub fn open_terminal(tool_id: &str, tool_path: &str, dir: &str) -> Result<()> {
+    terminal_command(tool_id, tool_path, dir).spawn()?;
+    Ok(())
+}
+
+/// The command that opens `tool_path` (a terminal from `detect_tools`) in `dir`.
+fn terminal_command(tool_id: &str, tool_path: &str, dir: &str) -> Command {
     let mut c = Command::new(tool_path);
     match tool_id {
         "wt" => {
@@ -216,7 +218,9 @@ pub fn open_terminal(tool_id: &str, tool_path: &str, dir: &str) -> Result<()> {
             c.arg(format!("--cd={dir}"));
         }
         "cmd" => {
-            c.args(["/c", "start", "cmd", "/k", &format!("cd /d \"{dir}\"")]);
+            // The new window starts in our working directory: a `cd` command
+            // line would let a `"` in the path end the quoting.
+            c.args(["/c", "start", "cmd"]);
         }
         "pwsh" | "powershell" => {
             c.args(["-NoExit", "-Command", &format!("Set-Location -LiteralPath '{}'", dir.replace('\'', "''"))]);
@@ -227,12 +231,10 @@ pub fn open_terminal(tool_id: &str, tool_path: &str, dir: &str) -> Result<()> {
                 c.creation_flags(CREATE_NEW_CONSOLE);
             }
         }
-        _ => {
-            c.current_dir(dir);
-        }
+        _ => {}
     }
-    c.current_dir(dir).spawn()?;
-    Ok(())
+    c.current_dir(dir);
+    c
 }
 
 pub fn open_merge_tool(repo: &str, file: &str, tool_id: Option<&str>) -> Result<()> {
@@ -242,4 +244,18 @@ pub fn open_merge_tool(repo: &str, file: &str, tool_id: Option<&str>) -> Result<
     }
     args.extend(["--", file]);
     cli::run(repo, &args).map(|_| ())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cmd_terminal_keeps_the_directory_out_of_its_command_line() {
+        let dir = "C:/repos/a\" & calc & \"b";
+        let c = terminal_command("cmd", "cmd.exe", dir);
+        let args: Vec<_> = c.get_args().map(|a| a.to_string_lossy().into_owned()).collect();
+        assert_eq!(args, ["/c", "start", "cmd"]);
+        assert_eq!(c.get_current_dir(), Some(Path::new(dir)));
+    }
 }

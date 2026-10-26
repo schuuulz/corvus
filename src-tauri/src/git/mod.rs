@@ -13,8 +13,9 @@ pub mod patch;
 pub mod refs;
 pub mod status;
 
-use git2::Repository;
+use git2::{Oid, Repository};
 use serde::Serialize;
+use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -36,6 +37,39 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub fn msg<T>(m: impl Into<String>) -> Result<T> {
     Err(Error::Msg(m.into()))
+}
+
+/// A ref, remote, URL or path from the UI that git receives as a positional
+/// argument. Git would parse one starting with `-` as an option, and some
+/// options run programs (`clone --upload-pack=<cmd>`), so those are refused.
+pub fn operand(value: &str) -> Result<&str> {
+    if value.starts_with('-') {
+        return msg(format!("\"{value}\" is not a valid name"));
+    }
+    Ok(value)
+}
+
+/// A commit id from the UI, checked to be hexadecimal.
+pub fn commit_id(value: &str) -> Result<&str> {
+    Oid::from_str(value)?;
+    Ok(value)
+}
+
+/// `file` as a path relative to the repository root. Absolute paths and `..`
+/// would reach outside the repository (and make libgit2 lookups panic), so
+/// they are refused.
+pub fn repo_relative(file: &str) -> Result<&Path> {
+    let path = Path::new(file);
+    let relative = path.components().all(|c| matches!(c, Component::Normal(_) | Component::CurDir));
+    if file.is_empty() || !relative {
+        return msg(format!("{file} is outside the repository"));
+    }
+    Ok(path)
+}
+
+/// `file`, relative to the working directory `wd`, joined onto it.
+pub fn path_in_workdir(wd: &str, file: &str) -> Result<PathBuf> {
+    Ok(Path::new(wd).join(repo_relative(file)?))
 }
 
 pub fn open(path: &str) -> Result<Repository> {

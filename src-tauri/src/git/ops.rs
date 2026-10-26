@@ -1,7 +1,7 @@
 //! Ref-changing operations, remotes, stashes, interactive rebase, undo and
 //! config. All of these go through the git CLI.
 
-use super::{cli, Result};
+use super::{cli, commit_id, operand, Result};
 use git2::Oid;
 use serde::{Deserialize, Serialize};
 
@@ -12,11 +12,12 @@ fn ok(r: Result<String>) -> Result<()> {
 // --- branches & tags -------------------------------------------------------
 
 pub fn checkout(path: &str, target: &str) -> Result<()> {
-    ok(cli::run(path, &["checkout", target]))
+    ok(cli::run(path, &["checkout", operand(target)?]))
 }
 
 /// Checks out a remote branch, creating a local tracking branch when needed.
 pub fn checkout_remote(path: &str, remote_branch: &str) -> Result<()> {
+    let remote_branch = operand(remote_branch)?;
     let local = remote_branch.split_once('/').map(|(_, b)| b).unwrap_or(remote_branch);
     let repo = super::open(path)?;
     if repo.find_branch(local, git2::BranchType::Local).is_ok() {
@@ -27,26 +28,28 @@ pub fn checkout_remote(path: &str, remote_branch: &str) -> Result<()> {
 }
 
 pub fn create_branch(path: &str, name: &str, start: Option<&str>, checkout: bool) -> Result<()> {
+    let name = operand(name)?;
     let mut args = if checkout { vec!["checkout", "-b", name] } else { vec!["branch", name] };
     if let Some(s) = start {
-        args.push(s);
+        args.push(operand(s)?);
     }
     ok(cli::run(path, &args))
 }
 
 pub fn delete_branch(path: &str, name: &str, force: bool) -> Result<()> {
-    ok(cli::run(path, &["branch", if force { "-D" } else { "-d" }, name]))
+    ok(cli::run(path, &["branch", if force { "-D" } else { "-d" }, operand(name)?]))
 }
 
 pub fn rename_branch(path: &str, old: &str, new: &str) -> Result<()> {
-    ok(cli::run(path, &["branch", "-m", old, new]))
+    ok(cli::run(path, &["branch", "-m", operand(old)?, operand(new)?]))
 }
 
 pub fn set_upstream(path: &str, branch: &str, upstream: &str) -> Result<()> {
-    ok(cli::run(path, &["branch", "--set-upstream-to", upstream, branch]))
+    ok(cli::run(path, &["branch", "--set-upstream-to", operand(upstream)?, operand(branch)?]))
 }
 
 pub fn create_tag(path: &str, name: &str, target: &str, message: Option<&str>) -> Result<()> {
+    let (name, target) = (operand(name)?, operand(target)?);
     match message.filter(|m| !m.trim().is_empty()) {
         Some(m) => ok(cli::run(path, &["tag", "-a", name, target, "-m", m])),
         None => ok(cli::run(path, &["tag", name, target])),
@@ -54,7 +57,7 @@ pub fn create_tag(path: &str, name: &str, target: &str, message: Option<&str>) -
 }
 
 pub fn delete_tag(path: &str, name: &str) -> Result<()> {
-    ok(cli::run(path, &["tag", "-d", name]))
+    ok(cli::run(path, &["tag", "-d", operand(name)?]))
 }
 
 // --- history ---------------------------------------------------------------
@@ -66,20 +69,20 @@ pub fn merge(path: &str, from: &str, no_ff: bool, squash: bool) -> Result<String
     } else if no_ff {
         args.push("--no-ff");
     }
-    args.push(from);
+    args.push(operand(from)?);
     cli::run(path, &args)
 }
 
 pub fn rebase(path: &str, onto: &str) -> Result<String> {
-    cli::run(path, &["rebase", onto])
+    cli::run(path, &["rebase", operand(onto)?])
 }
 
 pub fn cherry_pick(path: &str, oid: &str) -> Result<String> {
-    cli::run(path, &["cherry-pick", oid])
+    cli::run(path, &["cherry-pick", commit_id(oid)?])
 }
 
 pub fn revert(path: &str, oid: &str) -> Result<String> {
-    cli::run(path, &["revert", "--no-edit", oid])
+    cli::run(path, &["revert", "--no-edit", commit_id(oid)?])
 }
 
 pub fn reset(path: &str, oid: &str, mode: &str) -> Result<()> {
@@ -89,7 +92,7 @@ pub fn reset(path: &str, oid: &str, mode: &str) -> Result<()> {
         "keep" => "--keep",
         _ => "--mixed",
     };
-    ok(cli::run(path, &["reset", flag, oid]))
+    ok(cli::run(path, &["reset", flag, commit_id(oid)?]))
 }
 
 // --- stash -----------------------------------------------------------------
@@ -174,28 +177,29 @@ pub fn push(path: &str, force: bool, progress: impl FnMut(&str)) -> Result<()> {
 }
 
 pub fn push_branch(path: &str, remote: &str, branch: &str, progress: impl FnMut(&str)) -> Result<()> {
-    ok(cli::run_streaming(path, &["push", "--progress", "-u", remote, branch], progress))
+    ok(cli::run_streaming(path, &["push", "--progress", "-u", operand(remote)?, operand(branch)?], progress))
 }
 
 pub fn delete_remote_branch(path: &str, remote: &str, branch: &str) -> Result<()> {
-    ok(cli::run(path, &["push", remote, "--delete", branch]))
+    ok(cli::run(path, &["push", operand(remote)?, "--delete", operand(branch)?]))
 }
 
 pub fn add_remote(path: &str, name: &str, url: &str) -> Result<()> {
-    ok(cli::run(path, &["remote", "add", name, url]))
+    ok(cli::run(path, &["remote", "add", operand(name)?, operand(url)?]))
 }
 
 pub fn remove_remote(path: &str, name: &str) -> Result<()> {
-    ok(cli::run(path, &["remote", "remove", name]))
+    ok(cli::run(path, &["remote", "remove", operand(name)?]))
 }
 
 pub fn clone(url: &str, dest: &str, progress: impl FnMut(&str)) -> Result<()> {
+    let (url, dest) = (operand(url)?, operand(dest)?);
     let parent = std::path::Path::new(dest)
         .parent()
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_else(|| ".".into());
     std::fs::create_dir_all(&parent)?;
-    ok(cli::run_streaming(&parent, &["clone", "--progress", url, dest], progress))
+    ok(cli::run_streaming(&parent, &["clone", "--progress", "--", url, dest], progress))
 }
 
 pub fn init(path: &str) -> Result<()> {
@@ -249,12 +253,11 @@ pub struct TodoItem {
 }
 
 pub fn rebase_interactive(path: &str, base: Option<&str>, todo: &[TodoItem]) -> Result<String> {
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    let dir = std::env::temp_dir().join(format!("corvus-rebase-{stamp}"));
-    std::fs::create_dir_all(&dir)?;
+    let base = base.map(commit_id).transpose()?;
+    // Git runs the `exec` lines of the todo file, so it lives in a fresh,
+    // private directory no other user can create first or write into.
+    let tmp = tempfile::Builder::new().prefix("corvus-rebase-").tempdir()?;
+    let dir = tmp.path();
     let mut script = String::new();
     for (i, t) in todo.iter().enumerate() {
         Oid::from_str(&t.oid)?;
@@ -280,9 +283,7 @@ pub fn rebase_interactive(path: &str, base: Option<&str>, todo: &[TodoItem]) -> 
         Some(b) => args.push(b),
         None => args.push("--root"),
     }
-    let r = cli::run_with(path, &args, None, &[("GIT_SEQUENCE_EDITOR", &seq_editor)]);
-    let _ = std::fs::remove_dir_all(&dir);
-    r
+    cli::run_with(path, &args, None, &[("GIT_SEQUENCE_EDITOR", &seq_editor)])
 }
 
 // --- undo ------------------------------------------------------------------
@@ -337,6 +338,7 @@ pub fn identity(path: Option<&str>) -> Identity {
 }
 
 pub fn set_config(path: Option<&str>, key: &str, value: &str) -> Result<()> {
+    let key = operand(key)?;
     let cwd = path.map(String::from).unwrap_or_else(home);
     let args: Vec<&str> = match path {
         Some(_) => vec!["config", key, value],
