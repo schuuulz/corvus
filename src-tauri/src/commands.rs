@@ -135,13 +135,13 @@ pub async fn abort_op(repo: String) -> Result<String> {
 }
 
 #[tauri::command]
-pub async fn checkout(repo: String, target: String) -> Result<OpOutcome> {
-    outcome::checkout(&repo, &target, false)
+pub async fn checkout(repo: String, target: String, autostash: bool) -> Result<OpOutcome> {
+    outcome::checkout(&repo, &target, false, autostash)
 }
 
 #[tauri::command]
-pub async fn checkout_remote(repo: String, branch: String) -> Result<OpOutcome> {
-    outcome::checkout(&repo, &branch, true)
+pub async fn checkout_remote(repo: String, branch: String, autostash: bool) -> Result<OpOutcome> {
+    outcome::checkout(&repo, &branch, true, autostash)
 }
 
 #[tauri::command]

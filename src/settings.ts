@@ -11,6 +11,7 @@ export const GLOBAL_DEFAULTS = {
   // general
   autoFetchMinutes: 1,
   autoPrune: true,
+  autoStashCheckout: true,
   updateSubmodules: true,
   deleteOrig: false,
   showAllCommits: false,

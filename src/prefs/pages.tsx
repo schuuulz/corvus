@@ -33,6 +33,7 @@ export function General() {
       <Toggle k="conflictDetection" label="Proactive conflict detection" help="Predict conflicts between your branch and its likely base branch. You can disable it per repository in Repo-Specific Preferences." />
       <h2>Repositories</h2>
       <GitText gitKey="init.defaultBranch" label="Default branch name" placeholder="main" help="Sets the default branch name when initialising new repositories." />
+      <Toggle k="autoStashCheckout" label="Bring changes along when switching branches" help="Uncommitted changes (staged, unstaged and new files) follow you to the branch you switch to. Changes that would conflict with it are kept in a stash instead." />
       <Toggle k="deleteOrig" label={'Delete ".orig" files after merging'} />
       <Toggle k="rememberTabs" label="Remember tabs" help="Reopen the repositories that were open when you last closed Corvus." />
       <h2>Graph</h2>

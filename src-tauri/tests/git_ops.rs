@@ -1,5 +1,6 @@
 //! End-to-end tests of the git backend against throwaway repositories.
 
+use corvus_lib::git::outcome::Autostash;
 use corvus_lib::git::{self, cli, commit, conflict, ext, graph, ops, outcome::{self, OpStatus}, refs, status};
 use std::fs;
 use std::process::Command;
@@ -207,13 +208,13 @@ fn outcomes_report_checkout_conflicts_and_noop() {
     write(&p, "f.txt", "base\n");
     commit_all(&p, "base");
     ops::create_branch(&p, "feat/x", None, false).unwrap();
-    let o = outcome::checkout(&p, "feat/x", false).unwrap();
+    let o = outcome::checkout(&p, "feat/x", false, true).unwrap();
     assert_eq!((o.from.as_deref(), o.to.as_deref(), o.status), (Some("main"), Some("feat/x"), OpStatus::Ok));
     write(&p, "f.txt", "theirs\n");
     status::stage_all(&p).unwrap();
     let c = outcome::commit(&p, "theirs\n", false, false, false).unwrap();
     assert_eq!(c.detail, "theirs");
-    outcome::checkout(&p, "main", false).unwrap();
+    outcome::checkout(&p, "main", false, true).unwrap();
     write(&p, "f.txt", "ours\n");
     commit_all(&p, "ours");
     let m = outcome::merge(&p, "feat/x", false, false).unwrap();
@@ -440,4 +441,213 @@ env > .git/hook-env
     let env = read(&p, ".git/hook-env");
     assert!(env.contains("GIT_EDITOR"), "the hook ran under Corvus' git");
     assert!(!env.contains(token), "a commit hook never sees integration tokens");
+}
+
+// --- switching branches with uncommitted changes (autostash) ---------------
+
+/// A repository on main with `f.txt` (eight lines), and `feat/x` changing
+/// `feat_line` of it to "feature".
+fn diverged(feat_line: usize) -> (tempfile::TempDir, String) {
+    let (d, p) = repo();
+    write(&p, "f.txt", "1
+2
+3
+4
+5
+6
+7
+8
+");
+    write(&p, "keep.txt", "keep
+");
+    commit_all(&p, "base");
+    sh(&p, &["checkout", "-q", "-b", "feat/x"]);
+    let lines: Vec<String> = (1..=8).map(|i| if i == feat_line { "feature".into() } else { i.to_string() }).collect();
+    write(&p, "f.txt", &(lines.join("
+") + "
+"));
+    commit_all(&p, "feature");
+    sh(&p, &["checkout", "-q", "main"]);
+    (d, p)
+}
+
+fn stash_count(p: &str) -> usize {
+    refs::list(p).unwrap().stashes.len()
+}
+
+fn file_status(p: &str, file: &str) -> (Option<&'static str>, Option<&'static str>) {
+    let st = status::status(p).unwrap();
+    let f = st.files.iter().find(|f| f.path == file).unwrap_or_else(|| panic!("{file} has no changes"));
+    (f.staged, f.unstaged)
+}
+
+#[test]
+fn autostash_carries_staged_unstaged_and_untracked_changes() {
+    let (_d, p) = diverged(1);
+    write(&p, "keep.txt", "keep, staged
+");
+    sh(&p, &["add", "keep.txt"]);
+    write(&p, "f.txt", "1
+2
+3
+4
+5
+6
+7
+local
+");
+    write(&p, "new.txt", "untracked
+");
+
+    // Git alone refuses: f.txt changed on both sides.
+    assert!(outcome::checkout(&p, "feat/x", false, false).is_err());
+    assert_eq!(read(&p, "f.txt"), "1
+2
+3
+4
+5
+6
+7
+local
+", "a refused checkout keeps the changes");
+
+    let o = outcome::checkout(&p, "feat/x", false, true).unwrap();
+    assert_eq!((o.to.as_deref(), o.status), (Some("feat/x"), OpStatus::Ok));
+    assert_eq!(o.autostash, Some(Autostash::Restored { unstaged_only: false }));
+    assert_eq!(read(&p, "f.txt"), "feature
+2
+3
+4
+5
+6
+7
+local
+", "both sides' changes are there");
+    assert_eq!(file_status(&p, "keep.txt"), (Some("M"), None), "staged stays staged");
+    assert_eq!(file_status(&p, "f.txt"), (None, Some("M")), "unstaged stays unstaged");
+    assert_eq!(read(&p, "new.txt"), "untracked
+");
+    assert_eq!(stash_count(&p), 0, "the autostash is dropped once applied");
+}
+
+#[test]
+fn autostash_keeps_conflicting_changes_in_a_stash() {
+    let (_d, p) = diverged(8);
+    write(&p, "f.txt", "1
+2
+3
+4
+5
+6
+7
+local
+");
+
+    let o = outcome::checkout(&p, "feat/x", false, true).unwrap();
+    assert_eq!((o.to.as_deref(), o.status), (Some("feat/x"), OpStatus::Warning));
+    let Some(Autostash::Kept { message, files }) = o.autostash else { panic!("expected Kept, got {:?}", o.autostash) };
+    assert_eq!(files, vec!["f.txt".to_string()]);
+    assert_eq!(message, "Corvus autostash: main → feat/x");
+    assert_eq!(read(&p, "f.txt"), "1
+2
+3
+4
+5
+6
+7
+feature
+", "the new branch is untouched");
+    assert!(status::status(&p).unwrap().files.is_empty());
+    let stashes = refs::list(&p).unwrap().stashes;
+    assert_eq!(stashes.len(), 1);
+    assert!(stashes[0].message.contains("Corvus autostash: main → feat/x"));
+}
+
+#[test]
+fn autostash_keeps_untracked_files_the_target_already_has() {
+    let (_d, p) = diverged(1);
+    sh(&p, &["checkout", "-q", "feat/x"]);
+    write(&p, "new.txt", "tracked on feat/x
+");
+    commit_all(&p, "add new.txt");
+    sh(&p, &["checkout", "-q", "main"]);
+    write(&p, "new.txt", "mine
+");
+
+    let o = outcome::checkout(&p, "feat/x", false, true).unwrap();
+    let Some(Autostash::Kept { files, .. }) = o.autostash else { panic!("expected Kept, got {:?}", o.autostash) };
+    assert_eq!(files, vec!["new.txt".to_string()]);
+    assert_eq!(read(&p, "new.txt"), "tracked on feat/x
+");
+    assert_eq!(stash_count(&p), 1);
+}
+
+#[test]
+fn autostash_leaves_changes_alone_when_the_switch_fails() {
+    let (_d, p) = diverged(1);
+    write(&p, "keep.txt", "keep, staged
+");
+    sh(&p, &["add", "keep.txt"]);
+    write(&p, "f.txt", "1
+2
+3
+4
+5
+6
+7
+local
+");
+
+    // A target that doesn't exist is refused before anything is stashed.
+    assert!(outcome::checkout(&p, "nope", false, true).is_err());
+    assert_eq!(stash_count(&p), 0);
+
+    // A branch checked out in another worktree passes the check, so git
+    // fails after the stash: the changes come back where they were.
+    let other = tempfile::tempdir().unwrap();
+    let other = other.path().join("wt").to_string_lossy().replace('\\', "/");
+    sh(&p, &["worktree", "add", "-q", &other, "feat/x"]);
+    assert!(outcome::checkout(&p, "feat/x", false, true).is_err());
+    assert_eq!(git::open(&p).unwrap().head().unwrap().shorthand().unwrap(), "main");
+    assert_eq!(read(&p, "f.txt"), "1
+2
+3
+4
+5
+6
+7
+local
+");
+    assert_eq!(file_status(&p, "keep.txt"), (Some("M"), None));
+    assert_eq!(stash_count(&p), 0);
+}
+
+#[test]
+fn autostash_carries_changes_onto_a_new_tracking_branch() {
+    let (_o, origin) = diverged(1);
+    let dir = tempfile::tempdir().unwrap();
+    let clone = dir.path().join("clone").to_string_lossy().replace('\\', "/");
+    sh(&origin, &["clone", "-q", &origin, &clone]);
+    write(&clone, "f.txt", "1
+2
+3
+4
+5
+6
+7
+local
+");
+
+    let o = outcome::checkout(&clone, "origin/feat/x", true, true).unwrap();
+    assert_eq!(o.to.as_deref(), Some("feat/x"));
+    assert_eq!(o.autostash, Some(Autostash::Restored { unstaged_only: false }));
+    assert_eq!(read(&clone, "f.txt"), "feature
+2
+3
+4
+5
+6
+7
+local
+");
 }

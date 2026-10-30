@@ -145,7 +145,8 @@ export async function push(force = false) {
 }
 
 export async function checkout(target: string, remote = false) {
-  const o = await S().run("Checkout", (rp) => (remote ? api.checkoutRemote(rp, target) : api.checkout(rp, target)), {
+  const autostash = g("autoStashCheckout");
+  const o = await S().run("Checkout", (rp) => (remote ? api.checkoutRemote(rp, target, autostash) : api.checkout(rp, target, autostash)), {
     loading: t("checkout.loading", { to: target }),
     success: fb.checkout,
   });
