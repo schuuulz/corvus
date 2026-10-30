@@ -82,6 +82,7 @@ export const GLOBAL_DEFAULTS = {
   rightCollapsed: false,
   terminalHeight: 260,
   zoom: 1,
+  /** Default commit table column widths, for repositories without their own. */
   colWidths: { refs: 190, message: 520, author: 140, date: 150, sha: 70 } as Record<string, number>,
   tabs: [] as string[],
   recent: [] as string[],
@@ -99,6 +100,8 @@ export const REPO_DEFAULTS = {
   conflictDetection: true,
   baseBranches: "**",
   issueTracker: "",
+  /** Commit table column widths sized in this repository (see CommitGraph). */
+  colWidths: {} as Record<string, number>,
 };
 
 export type GlobalSettings = typeof GLOBAL_DEFAULTS;
