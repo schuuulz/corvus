@@ -96,16 +96,15 @@ pub async fn delete_orig_files(repo: String) -> Result<usize> {
 // --- files -----------------------------------------------------------------
 
 #[tauri::command]
-pub async fn read_text_file(path: String) -> Result<String> {
-    system::read_text(&path)
+pub async fn read_public_key(path: String) -> Result<String> {
+    system::read_public_key(&path)
 }
 
 /// Writes a file inside a repository's working tree.
 #[tauri::command]
 pub async fn write_repo_file(repo: String, file: String, content: String) -> Result<()> {
     let wd = git::workdir(&git::open(&repo)?)?;
-    let path = git::path_in_workdir(&wd, &file)?;
-    Ok(std::fs::write(path, content)?)
+    git::write_in_workdir(&wd, &file, &content)
 }
 
 // --- ssh / gpg ---------------------------------------------------------------
@@ -133,13 +132,13 @@ pub async fn detect_tools() -> Result<Vec<system::ExternalTool>> {
 }
 
 #[tauri::command]
-pub async fn open_in_editor(tool_path: String, target: String) -> Result<()> {
-    system::open_in_editor(&tool_path, &target)
+pub async fn open_in_editor(tool_id: String, target: String) -> Result<()> {
+    system::open_in_editor(&tool_id, &target)
 }
 
 #[tauri::command]
-pub async fn open_terminal(tool_id: String, tool_path: String, dir: String) -> Result<()> {
-    system::open_terminal(&tool_id, &tool_path, &dir)
+pub async fn open_terminal(tool_id: String, dir: String) -> Result<()> {
+    system::open_terminal(&tool_id, &dir)
 }
 
 #[tauri::command]
@@ -274,7 +273,7 @@ pub async fn integration_create_pr(kind: Kind, host: String, repo: String, pr: i
 
 #[tauri::command]
 pub async fn integration_add_ssh_key(kind: Kind, host: String, title: String, public_key_path: String) -> Result<()> {
-    let key = system::read_text(&public_key_path)?;
+    let key = system::read_public_key(&public_key_path)?;
     integ::add_ssh_key(kind, &host, &title, &key).await
 }
 

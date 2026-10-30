@@ -224,7 +224,7 @@ export function Ssh() {
   };
   const copyPub = async () => {
     try {
-      await navigator.clipboard.writeText((await ext.readTextFile(pub)).trim());
+      await navigator.clipboard.writeText((await ext.readPublicKey(pub)).trim());
       toast("Public key copied", "success");
     } catch (e) {
       toast(String(e), "error");

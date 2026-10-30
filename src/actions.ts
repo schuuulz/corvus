@@ -291,28 +291,26 @@ export const commit = (message: string, amend: boolean, noVerify: boolean, strip
 
 // --- external tools --------------------------------------------------------
 
-async function tool(kind: "editor" | "terminal", id: string) {
-  if (!id) {
-    S().notify({ kind: "warning", title: `No external ${kind} configured`, description: "Choose one in Preferences › External Tools" });
-    S().openPrefs("tools");
-    return null;
-  }
-  const tools = await ext.detectTools();
-  return tools.find((x) => x.kind === kind && x.id === id) ?? null;
+/** The configured tool of `kind`, or null (pointing to the preferences) when none is. */
+function configuredTool(kind: "editor" | "terminal", id: string): string | null {
+  if (id) return id;
+  S().notify({ kind: "warning", title: `No external ${kind} configured`, description: "Choose one in Preferences › External Tools" });
+  S().openPrefs("tools");
+  return null;
 }
 
 export async function openInEditor(file?: string) {
   const repo = active();
   if (!repo) return;
-  const tl = await tool("editor", g("editorTool"));
-  if (tl) await ext.openInEditor(tl.path, file ? `${repo}/${file}` : repo).catch((e) => S().toast(gitMessage(e), "error"));
+  const id = configuredTool("editor", g("editorTool"));
+  if (id) await ext.openInEditor(id, file ? `${repo}/${file}` : repo).catch((e) => S().toast(gitMessage(e), "error"));
 }
 
 export async function openExternalTerminal() {
   const repo = active();
   if (!repo) return;
-  const tl = await tool("terminal", g("terminalTool"));
-  if (tl) await ext.openTerminal(tl.id, tl.path, repo).catch((e) => S().toast(gitMessage(e), "error"));
+  const id = configuredTool("terminal", g("terminalTool"));
+  if (id) await ext.openTerminal(id, repo).catch((e) => S().toast(gitMessage(e), "error"));
 }
 
 export async function openMergeTool(file: string) {

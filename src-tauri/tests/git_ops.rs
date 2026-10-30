@@ -369,8 +369,45 @@ fn file_paths_stay_inside_the_repository() {
         assert!(status::versions(&p, &file, None, "unstaged", None, None).is_err(), "{file}");
         assert!(status::versions(&p, &file, None, "staged", None, None).is_err(), "{file}");
         assert!(status::discard(&p, std::slice::from_ref(&file)).is_err(), "{file}");
+        assert!(commit::blame(&p, &file).is_err(), "{file}");
     }
     assert!(!outside.exists(), "nothing was written outside the repo");
+}
+
+/// Creates a symbolic link; false where the OS doesn't allow it (Windows
+/// without Developer Mode).
+fn symlink(target: &std::path::Path, link: &std::path::Path) -> bool {
+    #[cfg(unix)]
+    return std::os::unix::fs::symlink(target, link).is_ok();
+    #[cfg(windows)]
+    return if target.is_dir() { std::os::windows::fs::symlink_dir(target, link) } else { std::os::windows::fs::symlink_file(target, link) }.is_ok();
+}
+
+#[test]
+fn symbolic_links_never_lead_outside_the_repository() {
+    let (_d, p) = repo();
+    let outside = tempfile::tempdir().unwrap();
+    let secret = outside.path().join("secret.txt");
+    fs::write(&secret, "secret
+").unwrap();
+    let wd = std::path::Path::new(&p);
+    if !symlink(&secret, &wd.join("link.txt")) || !symlink(outside.path(), &wd.join("linked-dir")) {
+        eprintln!("skipped: this system doesn't allow creating symbolic links");
+        return;
+    }
+
+    // Like git, a link reads as the path it points to, not as that file.
+    let link = status::versions(&p, "link.txt", None, "unstaged", None, None).unwrap();
+    assert_eq!(link.modified, secret.to_string_lossy().replace('\\', "/"));
+    let behind = status::versions(&p, "linked-dir/secret.txt", None, "unstaged", None, None).unwrap();
+    assert_eq!(behind.modified, "", "nothing is read behind a linked directory");
+
+    for file in ["link.txt", "linked-dir/secret.txt"] {
+        assert!(git::write_in_workdir(&p, file, "changed").is_err(), "{file}");
+        assert!(conflict::resolve(&p, file, "changed").is_err(), "{file}");
+    }
+    assert_eq!(fs::read_to_string(&secret).unwrap(), "secret
+", "the file outside was not touched");
 }
 
 #[test]
