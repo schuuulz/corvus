@@ -2,7 +2,7 @@
 //! where, and whether they stopped on conflicts) so the UI can give precise
 //! feedback instead of guessing from git's text output.
 
-use super::{commit, ops, Error, Result};
+use super::{autostash, commit, ops, Error, Result};
 use git2::{Oid, Repository, Status, StatusOptions};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -18,6 +18,19 @@ pub enum OpStatus {
     Noop,
 }
 
+/// What became of uncommitted changes carried across a branch switch.
+#[derive(Serialize, Debug, PartialEq)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum Autostash {
+    /// They came along to the new branch (all as unstaged changes when git
+    /// couldn't keep staged ones staged).
+    Restored { unstaged_only: bool },
+    /// They would conflict with the new branch and wait in the stash `message`.
+    Kept { message: String, files: Vec<String> },
+    /// Applying them stopped on conflicts; the stash `message` was kept.
+    Conflicted { message: String, files: Vec<String> },
+}
+
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct OpOutcome {
@@ -27,11 +40,13 @@ pub struct OpOutcome {
     pub count: Option<usize>,
     pub conflicts: Vec<String>,
     pub detail: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub autostash: Option<Autostash>,
 }
 
 impl OpOutcome {
     fn ok() -> Self {
-        OpOutcome { status: OpStatus::Ok, from: None, to: None, count: None, conflicts: vec![], detail: String::new() }
+        OpOutcome { status: OpStatus::Ok, from: None, to: None, count: None, conflicts: vec![], detail: String::new(), autostash: None }
     }
     fn from_to(mut self, from: Option<String>, to: Option<String>) -> Self {
         self.from = from;
@@ -53,7 +68,7 @@ fn short_id(oid: &str) -> String {
 }
 
 /// Branch name of HEAD, or its short SHA when detached.
-fn head_label(repo: &Repository) -> Option<String> {
+pub(super) fn head_label(repo: &Repository) -> Option<String> {
     let head = repo.head().ok()?;
     if head.is_branch() {
         head.shorthand().ok().map(String::from)
@@ -66,7 +81,7 @@ fn head_oid(repo: &Repository) -> Option<Oid> {
     repo.head().ok().and_then(|h| h.target())
 }
 
-fn conflicted_files(repo: &Repository) -> Vec<String> {
+pub(super) fn conflicted_files(repo: &Repository) -> Vec<String> {
     let mut opts = StatusOptions::new();
     opts.include_untracked(false);
     repo.statuses(Some(&mut opts))
@@ -103,23 +118,30 @@ fn commits_between(repo: &Repository, old: Option<Oid>, new: Option<Oid>) -> usi
     }
 }
 
-pub fn checkout(path: &str, target: &str, remote: bool) -> Result<OpOutcome> {
+/// Checks out `target` (a remote branch when `remote`); with `autostash`,
+/// uncommitted changes come along (see `autostash`).
+pub fn checkout(path: &str, target: &str, remote: bool, autostash: bool) -> Result<OpOutcome> {
     let repo = super::open(path)?;
     let from = head_label(&repo);
     let created = remote && {
         let local = target.split_once('/').map(|(_, b)| b).unwrap_or(target);
         repo.find_branch(local, git2::BranchType::Local).is_err()
     };
-    if remote {
-        ops::checkout_remote(path, target)?;
-    } else {
-        ops::checkout(path, target)?;
-    }
+    let carried = autostash::switch(path, target, remote, autostash)?;
     let repo = super::open(path)?;
     let mut o = OpOutcome::ok().from_to(from, head_label(&repo));
     if created {
         o.detail = format!("tracking {target}");
     }
+    match &carried {
+        Some(Autostash::Kept { .. }) => o.status = OpStatus::Warning,
+        Some(Autostash::Conflicted { files, .. }) => {
+            o.status = OpStatus::Warning;
+            o.conflicts = files.clone();
+        }
+        _ => {}
+    }
+    o.autostash = carried;
     Ok(o)
 }
 

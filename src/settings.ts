@@ -11,6 +11,7 @@ export const GLOBAL_DEFAULTS = {
   // general
   autoFetchMinutes: 1,
   autoPrune: true,
+  autoStashCheckout: true,
   updateSubmodules: true,
   deleteOrig: false,
   showAllCommits: false,
@@ -33,6 +34,7 @@ export const GLOBAL_DEFAULTS = {
   dateTimeFormat: "DD/MM/YYYY @ HH:mm",
   dateVerboseFormat: "dddd, D MMMM YYYY [at] HH:mm",
   useAvatars: false,
+  hideTrackedRemotes: false,
   hoverHighlight: true,
   branchVisibility: "all" as "all" | "local" | "current",
   pinTrunk: true,
@@ -82,6 +84,7 @@ export const GLOBAL_DEFAULTS = {
   rightCollapsed: false,
   terminalHeight: 260,
   zoom: 1,
+  /** Default commit table column widths, for repositories without their own. */
   colWidths: { refs: 190, message: 520, author: 140, date: 150, sha: 70 } as Record<string, number>,
   tabs: [] as string[],
   recent: [] as string[],
@@ -99,6 +102,11 @@ export const REPO_DEFAULTS = {
   conflictDetection: true,
   baseBranches: "**",
   issueTracker: "",
+  /** Commit table column widths sized in this repository (see CommitGraph). */
+  colWidths: {} as Record<string, number>,
+  /** Left-panel sections (by id) and folders (by key) the user closed. */
+  collapsedSections: [] as string[],
+  collapsedFolders: [] as string[],
 };
 
 export type GlobalSettings = typeof GLOBAL_DEFAULTS;

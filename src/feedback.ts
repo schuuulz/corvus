@@ -19,10 +19,18 @@ export const fb = {
   checkout: (o: OpOutcome): Feedback => {
     const detached = !!o.to && /^[0-9a-f]{7}$/.test(o.to);
     const remote = o.detail.startsWith("tracking ") ? o.detail.slice(9) : null;
-    return {
-      title: t(detached ? "checkout.commit.title" : "checkout.title"),
-      description: remote ? t("checkout.tracking", { from: o.from, to: o.to, remote }) : t("checkout.desc", { from: o.from ?? "—", to: o.to }),
-    };
+    const switched = remote ? t("checkout.tracking", { from: o.from, to: o.to, remote }) : t("checkout.desc", { from: o.from ?? "—", to: o.to });
+    const carried = o.autostash;
+    if (carried?.kind === "kept") {
+      const why = carried.files.length ? t("checkout.autostash.kept.desc", { to: o.to, files: listFiles(carried.files) }) : t("checkout.autostash.kept.unknown", { to: o.to });
+      return { kind: "warning", title: t("checkout.autostash.kept.title", { to: o.to }), description: why };
+    }
+    if (carried?.kind === "conflicted") {
+      const c = conflicts(o);
+      return { kind: "warning", title: t("op.conflicts.title"), description: `${c?.description ?? ""} ${t("checkout.autostash.conflicted")}`.trim() };
+    }
+    const came = carried ? ` · ${t(carried.unstagedOnly ? "checkout.autostash.unstaged" : "checkout.autostash.restored")}` : "";
+    return { title: t(detached ? "checkout.commit.title" : "checkout.title"), description: switched + came };
   },
 
   fetch: (o: OpOutcome): Feedback =>
