@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.7.0](https://github.com/schuuulz/corvus/compare/corvus-v0.6.0...corvus-v0.7.0) (2026-10-30)
+
+
+### Features
+
+* branch panel navigation, per-repo columns, checkout autostash and download page ([7baebbd](https://github.com/schuuulz/corvus/commit/7baebbd89dc71da3ef272dbe25dd03e63006af9c))
+* **checkout:** bring uncommitted changes along when switching branches ([aa19829](https://github.com/schuuulz/corvus/commit/aa19829e2e723b1b339bc7cf6faee97d323312e1))
+* **checkout:** bring uncommitted changes along when switching branches ([4eeb49d](https://github.com/schuuulz/corvus/commit/4eeb49d9547d8861d68ac34b602b50f4988587ab))
+* **graph:** per-repository column widths and a selection-driven right panel ([5603e7f](https://github.com/schuuulz/corvus/commit/5603e7fe651c18ecab7f2e63d4736dea3fe24438))
+* **graph:** remember commit table column widths per repository ([4cd2cb7](https://github.com/schuuulz/corvus/commit/4cd2cb70f949bcdd088448bbed55156e145f29de))
+* **layout:** show the right panel only while something is selected ([cd6ad4a](https://github.com/schuuulz/corvus/commit/cd6ad4a41a0fb4991f068652340e00d863429b16))
+* **refs:** easier navigation in the left panel ([9765071](https://github.com/schuuulz/corvus/commit/97650713232c897639c8ce607088a61d5cb8af9b))
+* **refs:** easier navigation in the left panel ([eaf92c0](https://github.com/schuuulz/corvus/commit/eaf92c05bed82542bcb72afa8f5e8a9d870bc3d6))
+
+
+### Documentation
+
+* rewrite the README and add a download page ([d77a45b](https://github.com/schuuulz/corvus/commit/d77a45b80d6e57a463d1148976d2cef37c80d25f))
+* rewrite the README with screenshots ([701d1e1](https://github.com/schuuulz/corvus/commit/701d1e1d6cb85cc05ccff41a88af5f7696b521b6))
+* **site:** add a download page that picks the installer for your system ([8d89fd7](https://github.com/schuuulz/corvus/commit/8d89fd7277b74e6b158504ee590a23fca3065921))
+
 ## [0.6.0](https://github.com/schuuulz/corvus/compare/corvus-v0.5.0...corvus-v0.6.0) (2026-10-30)
 
 
