@@ -56,14 +56,15 @@ function Workspace() {
   const leftCollapsed = useG("leftCollapsed");
   const rightCollapsed = useG("rightCollapsed");
   const termH = useG("terminalHeight");
-  const { setG, set } = useStore.getState();
+  const { setG, set, select } = useStore.getState();
   const narrowRight = useNarrow(1280);
   const narrowLeft = useNarrow(960);
 
   const leftAsDrawer = narrowLeft;
   const rightAsDrawer = narrowRight;
-  const right = (onCollapse?: () => void) =>
-    selection?.kind === "commit" ? <CommitDetail oid={selection.oid} onCollapse={onCollapse} /> : <StagingPanel onCollapse={onCollapse} />;
+  const close = () => select(null);
+  const right = (onClose?: () => void) =>
+    selection?.kind === "commit" ? <CommitDetail oid={selection.oid} onClose={onClose} /> : <StagingPanel onClose={onClose} />;
 
   return (
     <>
@@ -107,8 +108,8 @@ function Workspace() {
           )}
         </div>
 
-        {/* right panel */}
-        {rightAsDrawer ? (
+        {/* right panel: only while a commit or the working changes are selected */}
+        {!selection ? null : rightAsDrawer ? (
           <div className="collapsed-rail right-rail">
             <button className="icon" title="Details" onClick={() => set({ drawer: drawer === "right" ? null : "right" })}>
               <PanelRightOpen size={16} />
@@ -123,11 +124,11 @@ function Workspace() {
         ) : (
           <>
             <Splitter onDrag={(d) => setG("rightWidth", clamp(g("rightWidth") - d, 300, 640))} onDoubleClick={() => setG("rightWidth", 380)} />
-            <div style={{ width: rightW, display: "flex", flex: "none" }}>{right(() => setG("rightCollapsed", true))}</div>
+            <div style={{ width: rightW, display: "flex", flex: "none" }}>{right(close)}</div>
           </>
         )}
 
-        {drawer && ((drawer === "left" && leftAsDrawer) || (drawer === "right" && rightAsDrawer)) && (
+        {drawer && ((drawer === "left" && leftAsDrawer) || (drawer === "right" && rightAsDrawer && selection)) && (
           <>
             <div className="drawer-back" onClick={() => set({ drawer: null })} />
             <div className={`drawer ${drawer}`} style={{ width: drawer === "left" ? Math.min(320, window.innerWidth - 60) : Math.min(400, window.innerWidth - 60), display: "flex" }}>
@@ -137,7 +138,7 @@ function Workspace() {
         )}
         <ActivityLog />
       </div>
-      <StatusBar leftCollapsed={leftCollapsed && !leftAsDrawer} rightCollapsed={rightCollapsed && !rightAsDrawer} />
+      <StatusBar leftCollapsed={leftCollapsed && !leftAsDrawer} rightCollapsed={rightCollapsed && !rightAsDrawer && !!selection} />
     </>
   );
 }
@@ -172,9 +173,12 @@ function useShortcuts() {
         e.preventDefault();
         s.view === "prefs" ? s.set({ view: "repo" }) : s.openPrefs();
       } else if (e.key === "Escape" && !s.modal && !s.dialog) {
+        // Closes the innermost thing open; with nothing else left, the selection.
+        const overlay = !!(s.menu || s.drawer || s.logOpen);
         s.set({ menu: null, drawer: null, logOpen: false });
         if (s.view === "prefs") s.set({ view: "repo" });
         else if (s.active && s.center[s.active] && s.center[s.active].kind !== "graph") s.setCenter({ kind: "graph" });
+        else if (!overlay && !typing && hasRepo) s.select(null);
       } else if (!hasRepo || s.modal || s.dialog || s.view === "prefs") {
         return;
       } else if (e.ctrlKey && e.altKey && k === "f") {

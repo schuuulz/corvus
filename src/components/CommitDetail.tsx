@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Copy, FileDiff, MoreHorizontal, PanelRightClose } from "lucide-react";
+import { Copy, FileDiff, MoreHorizontal, X } from "lucide-react";
 import { api, ChangedFile, CommitDetail as Detail } from "../api";
 import { commitMenu, openInEditor } from "../actions";
 import { useDateFormat } from "../hooks";
@@ -54,7 +54,7 @@ export function useFileView(): ["path" | "tree", (v: "path" | "tree") => void] {
   ];
 }
 
-export default function CommitDetail({ oid, onCollapse }: { oid: string; onCollapse?: () => void }) {
+export default function CommitDetail({ oid, onClose }: { oid: string; onClose?: () => void }) {
   const repo = useStore((s) => s.active)!;
   const row = useStore((s) => s.repos[repo]?.graph?.rows.find((r) => r.oid === oid));
   const wip = useStore((s) => s.repos[repo]?.status?.files.length ?? 0);
@@ -78,9 +78,9 @@ export default function CommitDetail({ oid, onCollapse }: { oid: string; onColla
   const head = (
     <div className="files-head" style={{ position: "static" }}>
       <span>Commit</span>
-      {onCollapse && (
-        <button className="icon" title="Hide panel" onClick={onCollapse}>
-          <PanelRightClose size={14} />
+      {onClose && (
+        <button className="icon" title="Close (Esc)" onClick={onClose}>
+          <X size={14} />
         </button>
       )}
     </div>
