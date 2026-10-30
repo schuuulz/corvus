@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src https://api.github.com; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="description" content="Download Corvus, a fast, friendly desktop Git client for Windows, macOS and Linux." />
+    <title>Download Corvus</title>
+    <link rel="icon" href="app-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="download.js" defer></script>
+  </head>
+  <body>
+    <header class="top">
+      <a class="brand" href="https://github.com/schuuulz/corvus">
+        <img src="app-icon.svg" alt="" width="28" height="28" />
+        <span>Corvus</span>
+      </a>
+      <a class="source" href="https://github.com/schuuulz/corvus">Source on GitHub</a>
+    </header>
+
+    <main>
+      <section class="hero">
+        <h1>A fast, friendly Git client</h1>
+        <p class="lead">Commit graph, line-level staging, a 3-way merge editor, interactive rebase and GitHub/GitLab integration, for Windows, macOS and Linux.</p>
+
+        <div id="download" class="download" aria-live="polite">
+          <p class="status">Finding the latest version…</p>
+        </div>
+
+        <p class="also">
+          <a id="all-releases" href="https://github.com/schuuulz/corvus/releases/latest">All downloads and release notes</a>
+        </p>
+      </section>
+
+      <img class="shot" src="overview.png" alt="Corvus showing a commit graph with branches, the left branch panel and commit details" width="1440" height="900" />
+
+      <section id="others" class="others" hidden>
+        <h2>Other platforms</h2>
+        <ul id="other-list"></ul>
+        <p class="checksums">Verify a download against <a id="checksums" href="https://github.com/schuuulz/corvus/releases/latest">SHA256SUMS.txt</a> from the same release.</p>
+      </section>
+
+      <section class="notes">
+        <h2>Installing</h2>
+        <p>Code signing is being set up, so your browser or system may warn about the installer until it is.</p>
+        <ul>
+          <li><strong>Windows:</strong> if SmartScreen says "Windows protected your PC", choose <em>More info › Run anyway</em>.</li>
+          <li><strong>macOS:</strong> if macOS can't verify the app, open it once, then choose <em>Open Anyway</em> in <em>System Settings › Privacy &amp; Security</em>.</li>
+          <li><strong>Linux:</strong> the <code>.AppImage</code> updates itself; <code>.deb</code> and <code>.rpm</code> tell you when a new version is out.</li>
+        </ul>
+        <p>Corvus checks for updates on launch and asks before installing them.</p>
+      </section>
+    </main>
+
+    <footer>
+      <p>Corvus is open source. No telemetry, no account needed.</p>
+    </footer>
+  </body>
+</html>
