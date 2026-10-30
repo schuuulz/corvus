@@ -3,7 +3,7 @@ import { ArrowLeft, Flame, GitBranchPlus, GitMerge, Loader2, Package, Workflow, 
 import { Gitflow } from "../api";
 import * as A from "../actions";
 import { t } from "../i18n";
-import { g, useRepo, useStore } from "../store";
+import { g, useG, useRepo, useStore } from "../store";
 
 type Kind = A.FlowKind;
 
@@ -220,12 +220,36 @@ export default function GitflowPanel() {
   );
 }
 
-/** Branch names the ">" Gitflow button appears on (configured or likely main branches). */
-export function useFlowBases(): Set<string> {
+/** The active repository's Gitflow configuration, loaded on first use. */
+function useGitflow(): Gitflow | null | undefined {
   const { repo } = useRepo();
   const gf = useStore((s) => (repo ? s.gitflow[repo] : undefined));
   useEffect(() => {
     if (repo && gf === undefined) void useStore.getState().loadGitflow(repo);
   }, [repo, gf]);
+  return gf;
+}
+
+/** Branch names the ">" Gitflow button appears on (configured or likely main branches). */
+export function useFlowBases(): Set<string> {
+  const gf = useGitflow();
   return useMemo(() => new Set(gf?.initialized ? [gf.master, gf.develop] : g("trunkBranches")), [gf]);
+}
+
+/** Names of integration branches, listed before the production ones. */
+const INTEGRATION_BRANCHES = ["develop", "dev"];
+
+/**
+ * The main branches, kept above the others in the branch lists: Gitflow's
+ * develop and master when it is set up, otherwise the trunk branches, with
+ * the integration branch first.
+ */
+export function usePinnedBranches(): string[] {
+  const gf = useGitflow();
+  const trunks = useG("trunkBranches");
+  return useMemo(() => {
+    if (gf?.initialized) return [gf.develop, gf.master];
+    const integration = trunks.filter((b) => INTEGRATION_BRANCHES.includes(b));
+    return [...integration, ...trunks.filter((b) => !integration.includes(b))];
+  }, [gf, trunks]);
 }
