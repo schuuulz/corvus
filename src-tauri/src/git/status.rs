@@ -260,9 +260,9 @@ pub fn versions(path: &str, file: &str, old_file: Option<&str>, mode: &str, oid:
     let (orig, modi) = match mode {
         "staged" => (tree_blob(&repo, head_tree.as_ref(), old_file), index_blob(&repo, file)),
         "unstaged" => {
-            let on_disk = super::path_in_workdir(&super::workdir(&repo)?, file)?;
+            let on_disk = super::read_in_workdir(&super::workdir(&repo)?, file).ok();
             let base = index_blob(&repo, file).or_else(|| tree_blob(&repo, head_tree.as_ref(), file));
-            (base, std::fs::read(on_disk).ok())
+            (base, on_disk)
         }
         "commit" => {
             let oid = oid.ok_or_else(|| Error::Msg("missing commit".into()))?;

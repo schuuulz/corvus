@@ -2,7 +2,6 @@
 
 use super::{cli, Result};
 use serde::Serialize;
-use std::path::Path;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +23,7 @@ pub fn versions(path: &str, file: &str) -> Result<ConflictVersions> {
     let repo = super::open(path)?;
     let index = repo.index()?;
     let wd = super::workdir(&repo)?;
-    let merged = std::fs::read(Path::new(&wd).join(file))
+    let merged = super::read_in_workdir(&wd, file)
         .map(|b| String::from_utf8_lossy(&b).into_owned())
         .unwrap_or_default();
     for c in index.conflicts()? {
@@ -50,7 +49,7 @@ pub fn versions(path: &str, file: &str) -> Result<ConflictVersions> {
 pub fn resolve(path: &str, file: &str, content: &str) -> Result<()> {
     let repo = super::open(path)?;
     let wd = super::workdir(&repo)?;
-    std::fs::write(super::path_in_workdir(&wd, file)?, content)?;
+    super::write_in_workdir(&wd, file, content)?;
     cli::run(path, &["add", "--", file]).map(|_| ())
 }
 

@@ -19,9 +19,32 @@ pub struct CliConfig {
     pub ssh_key: Option<String>,
     /// Keep command output in the activity log.
     pub extended_log: bool,
-    /// HTTPS hosts → (username, token) from connected integrations.
+    /// Tokens of connected integrations, for their HTTPS hosts.
     #[serde(skip)]
-    pub tokens: Vec<(String, String, String)>,
+    pub tokens: Vec<HostToken>,
+}
+
+/// A connected integration's token, presented to git for one HTTPS host.
+#[derive(Clone, Debug, PartialEq)]
+pub struct HostToken {
+    /// `host[:port]`, as in `https://<host>/owner/repo.git`.
+    pub host: String,
+    pub username: String,
+    pub token: String,
+}
+
+/// The remotes a network operation talks to. Git receives only the tokens
+/// for their hosts, and local operations receive none, so hooks, filters and
+/// tools started by git never see credentials they don't need.
+pub enum Reach<'a> {
+    /// Every remote of the repository (`fetch --all`, `pull`, `push`).
+    Remotes,
+    /// One remote of the repository, by name.
+    Remote(&'a str),
+    /// The URLs of the repository's submodules.
+    Submodules,
+    /// A URL that is not a remote yet (`clone`).
+    Url(&'a str),
 }
 
 static CONFIG: RwLock<Option<CliConfig>> = RwLock::new(None);
@@ -34,7 +57,7 @@ pub fn configure(mut cfg: CliConfig) {
     *cur = Some(cfg);
 }
 
-pub fn set_tokens(tokens: Vec<(String, String, String)>) {
+pub fn set_tokens(tokens: Vec<HostToken>) {
     let mut cur = CONFIG.write().unwrap();
     cur.get_or_insert_with(CliConfig::default).tokens = tokens;
 }
@@ -121,18 +144,70 @@ fn command(cwd: &str) -> Command {
         let key = key.replace('\\', "/");
         c.env("GIT_SSH_COMMAND", format!("ssh -i \"{key}\" -o IdentitiesOnly=yes"));
     }
-    // Serve integration tokens for their HTTPS hosts. The empty helper resets
-    // any configured helpers for that host so ours is the only one asked.
-    for (i, (host, user, token)) in cfg.tokens.iter().enumerate() {
-        let var = format!("CORVUS_TOKEN_{i}");
-        c.env(&var, token);
-        c.arg("-c").arg(format!("credential.https://{host}.helper="));
-        c.arg("-c").arg(format!(
-            "credential.https://{host}.helper=!f() {{ test \"$1\" = get && echo username={user} && echo password=${var}; }}; f"
-        ));
-    }
     no_window(&mut c);
     c
+}
+
+/// `command`, serving the integration tokens for the hosts `reach` talks to.
+/// The empty helper resets any configured helpers for such a host so ours is
+/// the only one asked.
+fn network_command(cwd: &str, reach: &Reach) -> Result<Command> {
+    let mut c = command(cwd);
+    let urls = reach_urls(cwd, reach)?;
+    for (i, t) in tokens_for(&config().tokens, &urls).into_iter().enumerate() {
+        let var = format!("CORVUS_TOKEN_{i}");
+        c.env(&var, &t.token);
+        c.arg("-c").arg(format!("credential.https://{}.helper=", t.host));
+        c.arg("-c").arg(format!(
+            "credential.https://{}.helper=!f() {{ test \"$1\" = get && echo username={} && echo password=${var}; }}; f",
+            t.host, t.username
+        ));
+    }
+    Ok(c)
+}
+
+/// The fetch and push URLs `reach` stands for.
+fn reach_urls(cwd: &str, reach: &Reach) -> Result<Vec<String>> {
+    let repo = || super::open(cwd);
+    match reach {
+        Reach::Url(url) => Ok(vec![url.to_string()]),
+        Reach::Remote(name) => remote_urls(&repo()?, name),
+        Reach::Remotes => {
+            let repo = repo()?;
+            let mut urls = Vec::new();
+            for name in repo.remotes()?.iter().flatten().flatten() {
+                urls.extend(remote_urls(&repo, name)?);
+            }
+            Ok(urls)
+        }
+        Reach::Submodules => Ok(repo()?.submodules()?.iter().filter_map(|s| s.url().ok().flatten().map(String::from)).collect()),
+    }
+}
+
+fn remote_urls(repo: &git2::Repository, name: &str) -> Result<Vec<String>> {
+    let remote = repo.find_remote(name)?;
+    let mut urls = vec![remote.url()?.to_string()];
+    urls.extend(remote.pushurl()?.map(String::from));
+    Ok(urls)
+}
+
+/// The tokens whose host one of `urls` points at over HTTPS.
+fn tokens_for<'a>(tokens: &'a [HostToken], urls: &[String]) -> Vec<&'a HostToken> {
+    let hosts: Vec<&str> = urls.iter().filter_map(|u| https_host(u)).collect();
+    tokens
+        .iter()
+        .filter(|t| hosts.iter().any(|h| h.eq_ignore_ascii_case(&t.host)))
+        .collect()
+}
+
+/// The `host[:port]` of an `https://` URL, without any user info.
+fn https_host(url: &str) -> Option<&str> {
+    let scheme = url.get(..8)?;
+    if !scheme.eq_ignore_ascii_case("https://") {
+        return None;
+    }
+    let authority = url[8..].split(['/', '?', '#']).next()?;
+    Some(authority.rsplit_once('@').map_or(authority, |(_, host)| host))
 }
 
 fn failure(args: &[&str], stdout: &[u8], stderr: &[u8]) -> Error {
@@ -187,10 +262,16 @@ pub fn run_with(
     }
 }
 
-/// Runs git, reporting each progress line (stderr, split on `\r`/`\n`).
-pub fn run_streaming(cwd: &str, args: &[&str], mut on_line: impl FnMut(&str)) -> Result<String> {
+/// Runs a git network operation that reaches `reach`.
+pub fn run_remote(cwd: &str, args: &[&str], reach: Reach) -> Result<String> {
+    run_remote_streaming(cwd, args, reach, |_| {})
+}
+
+/// Runs a git network operation that reaches `reach`, reporting each progress
+/// line (stderr, split on `\r`/`\n`).
+pub fn run_remote_streaming(cwd: &str, args: &[&str], reach: Reach, mut on_line: impl FnMut(&str)) -> Result<String> {
     let start = Instant::now();
-    let mut c = command(cwd);
+    let mut c = network_command(cwd, &reach)?;
     c.args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -239,4 +320,31 @@ pub fn run_streaming(cwd: &str, args: &[&str], mut on_line: impl FnMut(&str)) ->
 /// Forward-slash path, safe to embed in a single-quoted sh string.
 pub fn sh_path(p: &std::path::Path) -> String {
     p.to_string_lossy().replace('\\', "/").replace('\'', "'\\''")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn token(host: &str) -> HostToken {
+        HostToken { host: host.into(), username: "x-access-token".into(), token: format!("secret-{host}") }
+    }
+
+    #[test]
+    fn https_host_strips_user_info_and_path() {
+        assert_eq!(https_host("https://github.com/o/r.git"), Some("github.com"));
+        assert_eq!(https_host("HTTPS://user:pw@git.example.com:8443/o/r"), Some("git.example.com:8443"));
+        assert_eq!(https_host("https://gitlab.com"), Some("gitlab.com"));
+        assert_eq!(https_host("http://github.com/o/r"), None);
+        assert_eq!(https_host("git@github.com:o/r.git"), None);
+        assert_eq!(https_host("/home/me/repo"), None);
+    }
+
+    #[test]
+    fn only_tokens_for_reached_hosts_are_served() {
+        let tokens = [token("github.com"), token("gitlab.com"), token("git.example.com")];
+        let urls = ["https://GitHub.com/o/r.git".to_string(), "git@gitlab.com:o/r.git".to_string()];
+        assert_eq!(tokens_for(&tokens, &urls), [&tokens[0]]);
+        assert!(tokens_for(&tokens, &[]).is_empty());
+    }
 }
