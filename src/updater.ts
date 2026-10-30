@@ -1,6 +1,7 @@
-// Updates Corvus on launch: when a newer release exists, it is downloaded and
-// installed straight away (UpdateOverlay shows the progress), then the app
-// restarts on the new version.
+// Offers updates on launch: when a newer release exists, UpdateOverlay asks
+// whether to install it now. Postponed, it waits behind the status bar's
+// "Restart to update". Installing downloads it, installs it and restarts
+// Corvus on the new version.
 
 import { check, DownloadEvent, Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -10,7 +11,7 @@ import { UpdateState, useStore } from "./store";
 
 const setUpdate = (update: UpdateState | null) => useStore.setState({ update });
 
-/** The update being installed, kept for "Try again" after a failure. */
+/** The update found on launch, kept until it is installed. */
 let pending: Update | null = null;
 
 export async function updateOnLaunch() {
@@ -23,7 +24,17 @@ export async function updateOnLaunch() {
     return;
   }
   pending = update;
-  await install(update);
+  setUpdate({ phase: "available", version: update.version });
+}
+
+/** Installs the update found on launch now (also "Try again" after a failure). */
+export function installUpdate() {
+  if (pending) void install(pending);
+}
+
+/** Leaves the update for later, behind the status bar's "Restart to update". */
+export function postponeUpdate() {
+  if (pending) setUpdate({ phase: "postponed", version: pending.version });
 }
 
 /** Downloads and installs `update`, reporting progress, then restarts. */
@@ -52,17 +63,6 @@ async function install(update: Update) {
   } catch (e) {
     setUpdate({ phase: "failed", version, message: String(e) });
   }
-}
-
-export function retryUpdate() {
-  if (pending) void install(pending);
-}
-
-/** Leaves the update for the next launch and goes back to work. */
-export function dismissUpdate() {
-  setUpdate(null);
-  void pending?.close();
-  pending = null;
 }
 
 /**
