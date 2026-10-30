@@ -2,6 +2,7 @@
 //! refs, talks to remotes, or should honour user hooks/config goes through
 //! the git CLI (see `cli`).
 
+pub mod autostash;
 pub mod cli;
 pub mod commit;
 pub mod conflict;

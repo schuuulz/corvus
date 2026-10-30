@@ -61,7 +61,12 @@ export interface UndoInfo { message: string; from: string; to: string }
 export interface Identity { name: string; email: string; defaultBranch: string }
 export type DiffMode = "unstaged" | "staged" | "commit";
 /** Structured result of an operation (see src-tauri/src/git/outcome.rs). */
-export interface OpOutcome { status: "ok" | "warning" | "noop"; from: string | null; to: string | null; count: number | null; conflicts: string[]; detail: string }
+/** What became of uncommitted changes carried across a branch switch (see `git/autostash.rs`). */
+export type Autostash =
+  | { kind: "restored"; unstagedOnly: boolean }
+  | { kind: "kept"; message: string; files: string[] }
+  | { kind: "conflicted"; message: string; files: string[] };
+export interface OpOutcome { status: "ok" | "warning" | "noop"; from: string | null; to: string | null; count: number | null; conflicts: string[]; detail: string; autostash?: Autostash }
 
 const call = <T>(cmd: string, args?: Record<string, unknown>) => invoke<T>(cmd, args);
 
@@ -92,8 +97,8 @@ export const api = {
   resolveConflict: (repo: string, file: string, content: string) => call<void>("resolve_conflict", { repo, file, content }),
   continueOp: (repo: string) => call<string>("continue_op", { repo }),
   abortOp: (repo: string) => call<string>("abort_op", { repo }),
-  checkout: (repo: string, target: string) => call<OpOutcome>("checkout", { repo, target }),
-  checkoutRemote: (repo: string, branch: string) => call<OpOutcome>("checkout_remote", { repo, branch }),
+  checkout: (repo: string, target: string, autostash: boolean) => call<OpOutcome>("checkout", { repo, target, autostash }),
+  checkoutRemote: (repo: string, branch: string, autostash: boolean) => call<OpOutcome>("checkout_remote", { repo, branch, autostash }),
   createBranch: (repo: string, name: string, start: string | null, checkout: boolean) =>
     call<void>("create_branch", { repo, name, start, checkout }),
   deleteBranch: (repo: string, name: string, force: boolean) => call<void>("delete_branch", { repo, name, force }),
