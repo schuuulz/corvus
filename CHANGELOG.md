@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.6.0](https://github.com/schuuulz/corvus/compare/corvus-v0.5.0...corvus-v0.6.0) (2026-10-30)
+
+
+### Features
+
+* **security:** scope tokens, confine file access and ask before updating ([b85522f](https://github.com/schuuulz/corvus/commit/b85522f3d9183b87a04cb495c4f2effe6b7a7fda))
+* **security:** scope tokens, confine file access and ask before updating ([070632e](https://github.com/schuuulz/corvus/commit/070632e053d1db15aa06fec18182709d2a8bd501))
+* **updater:** ask before installing an update ([2ec2574](https://github.com/schuuulz/corvus/commit/2ec25744374593cbe4fa3264a4af9ec74621ca10))
+
+
+### Bug Fixes
+
+* **git:** serve integration tokens only to network operations on their hosts ([356bbcd](https://github.com/schuuulz/corvus/commit/356bbcdd9d79bf4bfb44ab36a05fae9607d99902))
+* **integrations:** follow redirects only within the same origin ([ba922a6](https://github.com/schuuulz/corvus/commit/ba922a6b3f846d402f709b5f25e3dfdceb88db7b))
+* **privacy:** turn author avatars off by default ([c942791](https://github.com/schuuulz/corvus/commit/c942791225f4c6a98295559dcf8b27757e1bda3d))
+* **security:** confine what the frontend can read, write and launch ([95aa583](https://github.com/schuuulz/corvus/commit/95aa583654e7f58ffa615d3f74b862287db9fa11))
+
 ## [0.5.0](https://github.com/schuuulz/corvus/compare/corvus-v0.4.1...corvus-v0.5.0) (2026-10-26)
 
 
