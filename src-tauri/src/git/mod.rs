@@ -67,9 +67,44 @@ pub fn repo_relative(file: &str) -> Result<&Path> {
     Ok(path)
 }
 
-/// `file`, relative to the working directory `wd`, joined onto it.
+/// `file`, relative to the working directory `wd`, joined onto it. A path
+/// that passes through a symbolic link (or Windows junction) is refused: it
+/// would reach files outside the repository. `file` itself may be a link.
 pub fn path_in_workdir(wd: &str, file: &str) -> Result<PathBuf> {
-    Ok(Path::new(wd).join(repo_relative(file)?))
+    let mut path = PathBuf::from(wd);
+    let mut parts = repo_relative(file)?.components().peekable();
+    while let Some(part) = parts.next() {
+        path.push(part);
+        if parts.peek().is_some() && is_symlink(&path) {
+            return msg(format!("{file} is behind a symbolic link"));
+        }
+    }
+    Ok(path)
+}
+
+fn is_symlink(path: &Path) -> bool {
+    path.symlink_metadata().is_ok_and(|m| m.file_type().is_symlink())
+}
+
+/// Contents of `file` in the working directory as git sees them: a symbolic
+/// link reads as the path it points to, never as the file behind it.
+pub fn read_in_workdir(wd: &str, file: &str) -> Result<Vec<u8>> {
+    let path = path_in_workdir(wd, file)?;
+    if is_symlink(&path) {
+        let target = std::fs::read_link(&path)?;
+        return Ok(target.to_string_lossy().replace('\\', "/").into_bytes());
+    }
+    Ok(std::fs::read(path)?)
+}
+
+/// Writes `content` to `file` in the working directory. Writing through a
+/// symbolic link would change the file it points to, so links are refused.
+pub fn write_in_workdir(wd: &str, file: &str, content: &str) -> Result<()> {
+    let path = path_in_workdir(wd, file)?;
+    if is_symlink(&path) {
+        return msg(format!("{file} is a symbolic link"));
+    }
+    Ok(std::fs::write(path, content)?)
 }
 
 pub fn open(path: &str) -> Result<Repository> {

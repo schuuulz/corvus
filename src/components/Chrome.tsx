@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Archive, ArchiveRestore, Bell, ChevronDown, ChevronRight, Command, FolderGit2,
-  GitBranch, GitFork, Keyboard, ListTree, Minus, PanelLeftOpen, PanelRightOpen, Plus, Redo2, ScrollText, Search, Settings, Terminal,
+  GitBranch, GitFork, Keyboard, ListTree, Minus, PanelLeftOpen, PanelRightOpen, Plus, Redo2, RefreshCw, ScrollText, Search, Settings, Terminal,
   Trash2, Undo2, X, ZoomIn,
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
@@ -9,6 +9,7 @@ import { api, ext, LogEntry, PullMode } from "../api";
 import * as A from "../actions";
 import { t } from "../i18n";
 import { MenuEntry, NEW_TAB, useG, useR, useRepo, useStore } from "../store";
+import { installUpdate } from "../updater";
 import Logo from "./Logo";
 
 export function TabBar() {
@@ -293,6 +294,7 @@ export function StatusBar({ leftCollapsed, rightCollapsed }: { leftCollapsed: bo
       <button className="icon" title="Keyboard shortcuts" onClick={() => set({ modal: "shortcuts" })}>
         <Keyboard size={13} />
       </button>
+      <RestartToUpdate />
       <span className="zoom">
         <button className="icon" onClick={() => z(-0.1)} title="Zoom out (Ctrl+-)"><Minus size={11} /></button>
         <button className="icon" onClick={() => setG("zoom", 1)} title="Reset zoom (Ctrl+0)"><ZoomIn size={12} /> {Math.round(zoom * 100)}%</button>
@@ -305,6 +307,17 @@ export function StatusBar({ leftCollapsed, rightCollapsed }: { leftCollapsed: bo
       )}
       <span className="muted">v{version}</span>
     </div>
+  );
+}
+
+/** The update postponed on launch, installed (and Corvus restarted) on click. */
+function RestartToUpdate() {
+  const update = useStore((s) => s.update);
+  if (update?.phase !== "postponed") return null;
+  return (
+    <button className="small primary statusbar-update" title={t("update.available", { version: update.version })} onClick={installUpdate}>
+      <RefreshCw size={11} /> {t("update.restart")}
+    </button>
   );
 }
 

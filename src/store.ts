@@ -69,8 +69,13 @@ type Modal =
   | { kind: "rebase"; base: string | null }
   | { kind: "pr"; branch: string; base?: string };
 
-/** Progress of the update installed on launch (see `updater.ts`). */
+/**
+ * The update found on launch (see `updater.ts`): offered, postponed to the
+ * status bar's "Restart to update", or on its way to being installed.
+ */
 export type UpdateState =
+  | { phase: "available"; version: string }
+  | { phase: "postponed"; version: string }
   | { phase: "downloading"; version: string; done: number; total: number | null }
   | { phase: "installing"; version: string }
   | { phase: "relaunching"; version: string }
@@ -123,7 +128,7 @@ interface State {
   repoIntegration: Record<string, RepoIntegration | null>;
   /** Bumped when a pull request is opened, so open PR lists reload. */
   pullRequestsVersion: number;
-  /** The update being installed, if any. */
+  /** The update found on launch, if any. */
   update: UpdateState | null;
 
   init(): Promise<void>;

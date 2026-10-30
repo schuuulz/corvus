@@ -54,6 +54,27 @@ pub fn git_username(kind: Kind) -> &'static str {
     if kind.is_github() { "x-access-token" } else { "oauth2" }
 }
 
+const MAX_REDIRECTS: usize = 10;
+
+/// Redirects are followed only within the origin the request went to. The
+/// token travels in a header, and reqwest forwards custom ones such as
+/// GitLab's `PRIVATE-TOKEN` to whatever host a redirect points at.
+fn same_origin_redirects() -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(|attempt| {
+        if attempt.previous().len() > MAX_REDIRECTS {
+            attempt.error("too many redirects")
+        } else if follows_same_origin(attempt.previous(), attempt.url()) {
+            attempt.follow()
+        } else {
+            attempt.stop()
+        }
+    })
+}
+
+fn follows_same_origin(previous: &[reqwest::Url], next: &reqwest::Url) -> bool {
+    previous.last().is_some_and(|last| last.origin() == next.origin())
+}
+
 struct Client {
     kind: Kind,
     base: String,
@@ -74,6 +95,7 @@ impl Client {
         let http = reqwest::Client::builder()
             .user_agent("corvus")
             .timeout(std::time::Duration::from_secs(20))
+            .redirect(same_origin_redirects())
             .build()
             .map_err(err)?;
         Ok(Client { kind, base: api_base(kind, host), token, http })
@@ -337,6 +359,16 @@ pub fn parse_remote(url: &str) -> Option<RemoteRef> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn redirects_stay_on_the_same_origin() {
+        let url = |s: &str| reqwest::Url::parse(s).unwrap();
+        let from = [url("https://gitlab.example.com/api/v4/projects/1")];
+        assert!(follows_same_origin(&from, &url("https://gitlab.example.com/api/v4/projects/2")));
+        assert!(!follows_same_origin(&from, &url("https://evil.example.net/api/v4/projects/1")));
+        assert!(!follows_same_origin(&from, &url("http://gitlab.example.com/api/v4/projects/1")));
+        assert!(!follows_same_origin(&from, &url("https://gitlab.example.com:8443/api/v4/projects/1")));
+    }
 
     #[test]
     fn parses_remote_urls() {

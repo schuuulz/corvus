@@ -141,7 +141,7 @@ pub struct BlameLine {
 pub fn blame(path: &str, file: &str) -> Result<Vec<BlameLine>> {
     let repo = super::open(path)?;
     let wd = super::workdir(&repo)?;
-    let text = std::fs::read(Path::new(&wd).join(file))?;
+    let text = super::read_in_workdir(&wd, file)?;
     let text = String::from_utf8_lossy(&text);
     let lines: Vec<&str> = text.lines().collect();
     let blame = repo.blame_file(Path::new(file), Some(&mut BlameOptions::new()))?;

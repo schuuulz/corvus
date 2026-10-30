@@ -90,7 +90,12 @@ pub fn ssh_generate(path: Option<&str>, comment: &str, passphrase: &str) -> Resu
     Ok(SshKeyPair { public_key: format!("{path}.pub"), private_key: path })
 }
 
-pub fn read_text(path: &str) -> Result<String> {
+/// Contents of an SSH public key file. Only `.pub` files are read, so the
+/// UI can't be used to read private keys or any other file.
+pub fn read_public_key(path: &str) -> Result<String> {
+    if Path::new(path).extension().is_none_or(|e| e != "pub") {
+        return msg(format!("{path} is not a public key (.pub) file"));
+    }
     Ok(std::fs::read_to_string(path)?)
 }
 
@@ -197,13 +202,24 @@ fn mergetool_name(id: &str) -> &str {
     }
 }
 
-pub fn open_in_editor(tool_path: &str, target: &str) -> Result<()> {
-    Command::new(tool_path).arg(target).spawn()?;
+/// The detected tool `id` of `kind`. Tools are launched only from what
+/// `detect_tools` found, never from a program path the UI hands in.
+fn detected_tool(kind: &str, id: &str) -> Result<ExternalTool> {
+    match detect_tools().into_iter().find(|t| t.kind == kind && t.id == id) {
+        Some(tool) => Ok(tool),
+        None => msg(format!("{id} is not installed")),
+    }
+}
+
+pub fn open_in_editor(tool_id: &str, target: &str) -> Result<()> {
+    let editor = detected_tool("editor", tool_id)?;
+    Command::new(editor.path).arg(target).spawn()?;
     Ok(())
 }
 
-pub fn open_terminal(tool_id: &str, tool_path: &str, dir: &str) -> Result<()> {
-    terminal_command(tool_id, tool_path, dir).spawn()?;
+pub fn open_terminal(tool_id: &str, dir: &str) -> Result<()> {
+    let terminal = detected_tool("terminal", tool_id)?;
+    terminal_command(terminal.id, &terminal.path, dir).spawn()?;
     Ok(())
 }
 
@@ -249,6 +265,17 @@ pub fn open_merge_tool(repo: &str, file: &str, tool_id: Option<&str>) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_only_public_key_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let private = dir.path().join("id_ed25519");
+        let public = dir.path().join("id_ed25519.pub");
+        std::fs::write(&private, "PRIVATE").unwrap();
+        std::fs::write(&public, "ssh-ed25519 AAAA test").unwrap();
+        assert!(read_public_key(&private.to_string_lossy()).is_err());
+        assert_eq!(read_public_key(&public.to_string_lossy()).unwrap(), "ssh-ed25519 AAAA test");
+    }
 
     #[test]
     fn cmd_terminal_keeps_the_directory_out_of_its_command_line() {

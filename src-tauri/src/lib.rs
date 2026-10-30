@@ -95,7 +95,7 @@ pub fn run() {
             clear_activity_log,
             submodule_update,
             delete_orig_files,
-            read_text_file,
+            read_public_key,
             write_repo_file,
             ssh_generate,
             gpg_list,

@@ -1,6 +1,10 @@
+import { useEffect } from "react";
 import { t } from "../i18n";
 import { UpdateState, useStore } from "../store";
-import { dismissUpdate, retryUpdate } from "../updater";
+import { installUpdate, postponeUpdate } from "../updater";
+
+/** The phases the overlay shows; a postponed update lives in the status bar. */
+type ShownUpdate = Exclude<UpdateState, { phase: "postponed" }>;
 
 // The scene: a graph lane drawn left to right as the download progresses,
 // with a raven flying along it. Once downloaded, the raven lands on the last
@@ -15,13 +19,16 @@ const nodeX = (i: number) => START + ((END - START) * i) / (NODES - 1);
 const megabytes = (bytes: number) => `${(bytes / 1_048_576).toFixed(1)} MB`;
 
 /** Download progress in 0..1, or null while the size is unknown. */
-function progressOf(u: UpdateState): number | null {
+function progressOf(u: ShownUpdate): number | null {
+  if (u.phase === "available") return 0;
   if (u.phase !== "downloading") return 1;
   return u.total ? Math.min(1, u.done / u.total) : null;
 }
 
-function statusOf(u: UpdateState): string {
+function statusOf(u: ShownUpdate): string {
   switch (u.phase) {
+    case "available":
+      return t("update.prompt");
     case "downloading":
       return u.total ? t("update.downloading", { done: megabytes(u.done), total: megabytes(u.total) }) : t("update.downloadingSize", { done: megabytes(u.done) });
     case "installing":
@@ -45,7 +52,7 @@ function Raven() {
   );
 }
 
-function Scene({ update }: { update: UpdateState }) {
+function Scene({ update }: { update: ShownUpdate }) {
   const progress = progressOf(update);
   const landed = update.phase === "installing" || update.phase === "relaunching";
   const ravenX = START + (END - START) * (progress ?? 0);
@@ -78,22 +85,45 @@ function Scene({ update }: { update: UpdateState }) {
   );
 }
 
-/** Shown while the update installed on launch downloads, installs and restarts. */
+/** Escape postpones the update while the overlay waits for an answer. */
+function usePostponeOnEscape(waiting: boolean) {
+  useEffect(() => {
+    if (!waiting) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") postponeUpdate();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [waiting]);
+}
+
+/** Offers the update found on launch, then shows it download, install and restart. */
 export default function UpdateOverlay() {
   const update = useStore((s) => s.update);
-  if (!update) return null;
+  const waiting = update?.phase === "available" || update?.phase === "failed";
+  usePostponeOnEscape(waiting);
+  if (!update || update.phase === "postponed") return null;
+  const title = update.phase === "available" ? t("update.available", { version: update.version }) : t("update.title", { version: update.version });
   return (
     <div className="modal-back update-back">
-      <div className="modal update-modal" role="status" aria-live="polite">
-        <h3>{t("update.title", { version: update.version })}</h3>
+      <div className="modal update-modal" role={waiting ? "dialog" : "status"} aria-live="polite">
+        <h3>{title}</h3>
         <Scene update={update} />
         <p className={update.phase === "failed" ? "error-text small" : "muted small"}>{statusOf(update)}</p>
+        {update.phase === "available" && (
+          <div className="modal-actions">
+            <button onClick={postponeUpdate}>{t("update.later")}</button>
+            <button className="primary" autoFocus onClick={installUpdate}>
+              {t("update.install")}
+            </button>
+          </div>
+        )}
         {update.phase === "failed" && (
           <>
             <p className="muted small update-error">{update.message}</p>
             <div className="modal-actions">
-              <button onClick={dismissUpdate}>{t("update.continue")}</button>
-              <button className="primary" autoFocus onClick={retryUpdate}>
+              <button onClick={postponeUpdate}>{t("update.continue")}</button>
+              <button className="primary" autoFocus onClick={installUpdate}>
                 {t("update.retry")}
               </button>
             </div>
