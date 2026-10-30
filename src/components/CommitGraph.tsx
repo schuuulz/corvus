@@ -7,7 +7,7 @@ import RefsPopover from "./RefsPopover";
 import { RefIcons, refWhere } from "./RefIcons";
 import { useAvatar, useDateFormat } from "../hooks";
 import { GLOBAL_DEFAULTS, GlobalKey } from "../settings";
-import { g, shortSha, useG, useRepo, useStore } from "../store";
+import { MenuEntry, shortSha, useG, useR, useRepo, useStore } from "../store";
 import { Avatar, avatarColor, initials, laneColor } from "./ui";
 
 const ROW_H = 30;
@@ -312,32 +312,91 @@ const COLUMNS: Column[] = [
   { id: "sha", visible: "colSha", label: "SHA", min: 64 },
 ];
 
+const COLUMN_BY_ID = Object.fromEntries(COLUMNS.map((c) => [c.id, c])) as Record<ColumnId, Column>;
+
+/** Widest a column can get, by dragging, fitting or a hand-edited settings file. */
+const MAX_COL_W = 2000;
+
+type Widths = Partial<Record<ColumnId, number>>;
+
+const clampWidth = (id: ColumnId, w: number) => Math.min(MAX_COL_W, Math.max(COLUMN_BY_ID[id].min, Math.round(w)));
+
+/** Stored widths kept to known columns with usable numbers, within each column's range. */
+function sanitize(stored: Record<string, number>): Widths {
+  const widths: Widths = {};
+  for (const { id } of COLUMNS) {
+    const w = stored[id];
+    if (typeof w === "number" && Number.isFinite(w)) widths[id] = clampWidth(id, w);
+  }
+  return widths;
+}
+
+/** Width that shows the widest rendered cell of column `id` (and its header) in full. */
+function fittedWidth(id: ColumnId, root: HTMLElement): number {
+  let widest = 0;
+  for (const cell of root.querySelectorAll<HTMLElement>(`[data-col="${id}"]`)) {
+    const width = cell.style.width;
+    cell.style.width = "max-content";
+    widest = Math.max(widest, cell.getBoundingClientRect().width);
+    cell.style.width = width;
+  }
+  return clampWidth(id, Math.ceil(widest));
+}
+
 /**
- * Column widths (Preferences), resized by dragging a header edge and reset
- * by double-clicking it. The graph column fits the whole graph until the
- * user sizes it.
+ * Column widths, per repository. A repository without its own widths uses
+ * the default ones (set from any repository through the Columns menu). The
+ * graph column is never shared, since its lanes belong to one repository:
+ * it fits the whole graph until the user sizes it. Dragging a header edge
+ * resizes live and saves once, on release.
  */
 function useColumnWidths(graphFit: number) {
-  const stored = useG("colWidths");
-  const { setG } = useStore.getState();
-  const widthOf = (id: ColumnId) => stored[id] ?? (id === "graph" ? graphFit : GLOBAL_DEFAULTS.colWidths[id]);
-  const resize = (col: Column, startX: number) => {
-    const start = widthOf(col.id);
-    const move = (e: PointerEvent) => setG("colWidths", { ...g("colWidths"), [col.id]: Math.max(col.min, Math.round(start + e.clientX - startX)) });
+  const own = sanitize(useR("colWidths"));
+  const defaults = withoutGraph(sanitize(useG("colWidths")));
+  const [drag, setDrag] = useState<{ id: ColumnId; width: number } | null>(null);
+  const { setR, setG } = useStore.getState();
+
+  const widthOf = (id: ColumnId) => {
+    if (drag?.id === id) return drag.width;
+    return own[id] ?? (id === "graph" ? graphFit : defaults[id] ?? GLOBAL_DEFAULTS.colWidths[id]);
+  };
+  const save = (id: ColumnId, width: number | null) => {
+    const next = { ...own };
+    if (width === null) delete next[id];
+    else next[id] = clampWidth(id, width);
+    void setR("colWidths", next);
+  };
+  const resize = (id: ColumnId, startX: number, startWidth: number) => {
+    let width = startWidth;
+    const move = (e: PointerEvent) => {
+      width = clampWidth(id, startWidth + e.clientX - startX);
+      setDrag({ id, width });
+    };
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      setDrag(null);
+      if (width !== startWidth) save(id, width);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };
-  const reset = (id: ColumnId) => {
-    const next = { ...g("colWidths") };
-    delete next[id];
-    setG("colWidths", next);
-  };
-  return { widthOf, resize, reset };
+  /** Sizes `id` to its content; the graph goes back to fitting its lanes. */
+  const fit = (id: ColumnId, root: HTMLElement) => save(id, id === "graph" ? null : fittedWidth(id, root));
+  const menu: MenuEntry[] = [
+    { label: "Use these widths for all repositories", action: () => (void setG("colWidths", { ...defaults, ...withoutGraph(own) }), void setR("colWidths", graphOnly(own))) },
+    { label: "Reset widths to default", disabled: !Object.keys(own).length, action: () => void setR("colWidths", {}) },
+  ];
+  return { widthOf, resize, fit, menu };
 }
+
+function withoutGraph(widths: Widths): Widths {
+  const shared = { ...widths };
+  delete shared.graph;
+  return shared;
+}
+
+const graphOnly = (w: Widths): Widths => (w.graph === undefined ? {} : { graph: w.graph });
 
 /** Right padding of every row and of the header (`.row`, `.graph-head`). */
 const ROW_PAD = 10;
@@ -352,6 +411,8 @@ export default function CommitGraph() {
   const scroller = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewH, setViewH] = useState(600);
+  const [viewW, setViewW] = useState(0);
+  const wrap = useRef<HTMLDivElement>(null);
   const show = {
     colRefs: useG("colRefs"),
     colGraph: useG("colGraph"),
@@ -391,8 +452,12 @@ export default function CommitGraph() {
   const headIndex = hasWip && headRow ? rows.indexOf(headRow) : -1;
   const total = rows.length + offset;
   const graphFit = Math.max(1, graph?.width ?? 1) * LANE_W + GRAPH_PAD;
-  const { widthOf, resize, reset } = useColumnWidths(graphFit);
+  const { widthOf: storedWidth, resize, fit, menu: widthMenu } = useColumnWidths(graphFit);
   const columns = COLUMNS.filter((c) => show[c.visible]);
+  // The message column takes whatever room the others leave; its own width
+  // is the least it gets before the table scrolls sideways.
+  const othersW = columns.reduce((sum, c) => sum + (c.id === "message" ? 0 : storedWidth(c.id)), ROW_PAD);
+  const widthOf = (id: ColumnId) => (id === "message" ? Math.max(storedWidth("message"), viewW - othersW) : storedWidth(id));
   const rowW = columns.reduce((sum, c) => sum + widthOf(c.id), ROW_PAD);
   const graphW = widthOf("graph");
   const laneX = lanesFitting(graphW);
@@ -417,7 +482,10 @@ export default function CommitGraph() {
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setViewH(el.clientHeight));
+    const ro = new ResizeObserver(() => {
+      setViewH(el.clientHeight);
+      setViewW(el.clientWidth);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -446,7 +514,11 @@ export default function CommitGraph() {
   }, [nearEnd, loadMore]);
 
   const colMenu = (e: React.MouseEvent) =>
-    openMenu(e, COLUMNS.map((c) => ({ label: `${show[c.visible] ? "✓ " : "   "}${c.label}`, action: () => setG(c.visible, !show[c.visible] as never) })));
+    openMenu(e, [
+      ...COLUMNS.map((c) => ({ label: `${show[c.visible] ? "✓ " : "   "}${c.label}`, action: () => setG(c.visible, !show[c.visible] as never) })),
+      "sep",
+      ...widthMenu,
+    ]);
 
   const items = [];
   for (let i = first; i < last; i++) {
@@ -499,7 +571,7 @@ export default function CommitGraph() {
         }}
       >
         {show.colRefs && (
-          <div className="col refs-col" style={{ width: widthOf("refs") }}>
+          <div className="col refs-col" data-col="refs" style={{ width: widthOf("refs") }}>
             <Pills row={row} trunks={graph?.trunks ?? 0} />
             {!row.refs.length && hint && <BranchHint row={row} r={hint} trunks={graph?.trunks ?? 0} />}
           </div>
@@ -510,35 +582,35 @@ export default function CommitGraph() {
           </div>
         )}
         {show.colMessage && (
-          <div className="col msg-col" style={{ width: widthOf("message") }}>
+          <div className="col msg-col" data-col="message" style={{ width: widthOf("message") }}>
             <span className="msg-sum">{row.summary}</span>
             {descMode !== "never" && row.body && <span className={`msg-desc${descMode === "hover" ? " hover-only" : ""}`}>{row.body}</span>}
           </div>
         )}
         {show.colAuthor && (
-          <div className="col author-col" style={{ width: widthOf("author") }}>
+          <div className="col author-col" data-col="author" style={{ width: widthOf("author") }}>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{row.author}</span>
           </div>
         )}
-        {show.colDate && <div className="col date-col" style={{ width: widthOf("date") }}>{fmt(row.time)}</div>}
-        {show.colSha && <div className="col sha-col mono" style={{ width: widthOf("sha") }}>{shortSha(row.oid)}</div>}
+        {show.colDate && <div className="col date-col" data-col="date" style={{ width: widthOf("date") }}>{fmt(row.time)}</div>}
+        {show.colSha && <div className="col sha-col mono" data-col="sha" style={{ width: widthOf("sha") }}>{shortSha(row.oid)}</div>}
       </div>,
     );
   }
 
   return (
-    <div className="graph-wrap">
+    <div className="graph-wrap" ref={wrap}>
       <div className="graph-head" onContextMenu={(e) => (e.preventDefault(), colMenu(e))}>
         {/* Scrolled with the body (see onScroll); the Columns button stays put. */}
         <div className="graph-head-track" ref={head}>
           {columns.map((c) => (
-            <div key={c.id} className="col" style={{ width: widthOf(c.id) }}>
+            <div key={c.id} className="col" data-col={c.id} style={{ width: widthOf(c.id) }}>
               {c.label}
               <span
                 className="col-resize"
-                title="Drag to resize · double-click to reset"
-                onPointerDown={(e) => resize(c, e.clientX)}
-                onDoubleClick={() => reset(c.id)}
+                title="Drag to resize · double-click to fit the content"
+                onPointerDown={(e) => resize(c.id, e.clientX, widthOf(c.id))}
+                onDoubleClick={() => wrap.current && fit(c.id, wrap.current)}
               />
             </div>
           ))}

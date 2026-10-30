@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ExternalLink, GitCommitHorizontal, PanelRightClose, Undo2 } from "lucide-react";
+import { ExternalLink, GitCommitHorizontal, Undo2, X } from "lucide-react";
 import { api, FileStatus } from "../api";
 import { commit as commitAction, discardFiles, openInEditor, openMergeTool, push, stageAll, stageFiles, unstageAll, unstageFiles } from "../actions";
 import { r, useR, useRepo, useStore } from "../store";
@@ -63,7 +63,7 @@ function Row({ f, code, staged, selected, name, depth = 0 }: { f: FileStatus; co
 
 const SUMMARY_LIMIT = 72;
 
-export default function StagingPanel({ onCollapse }: { onCollapse?: () => void }) {
+export default function StagingPanel({ onClose }: { onClose?: () => void }) {
   const { repo, data } = useRepo();
   const center = useStore((s) => (s.active ? s.center[s.active] : undefined));
   const { toast, openPrefs } = useStore.getState();
@@ -131,9 +131,9 @@ export default function StagingPanel({ onCollapse }: { onCollapse?: () => void }
         <span>{files.length} file change{files.length === 1 ? "" : "s"} {data?.info?.headBranch ? `on ${data.info.headBranch}` : ""}</span>
         <span className="row-inline">
           <ViewToggle value={view} onChange={setView} />
-          {onCollapse && (
-            <button className="icon" title="Hide panel" onClick={onCollapse}>
-              <PanelRightClose size={14} />
+          {onClose && (
+            <button className="icon" title="Close (Esc)" onClick={onClose}>
+              <X size={14} />
             </button>
           )}
         </span>

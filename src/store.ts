@@ -104,7 +104,8 @@ interface State {
   view: "repo" | "prefs";
   prefsSection: string;
   repos: Record<string, RepoData>;
-  selection: Record<string, Selection>;
+  /** What each repository shows on the right: null for nothing (the panel hides), missing until it opens. */
+  selection: Record<string, Selection | null>;
   center: Record<string, CenterView>;
   redo: Record<string, string[]>;
   conflicts: Record<string, ConflictCheck>;
@@ -140,7 +141,7 @@ interface State {
   setActive(path: string): void;
   refresh(path?: string): Promise<void>;
   loadMore(): Promise<void>;
-  select(sel: Selection): void;
+  select(sel: Selection | null): void;
   setCenter(v: CenterView): void;
   run<T>(label: string, fn: (repo: string) => Promise<T>, opts?: RunOpts<T>): Promise<T | undefined>;
   toast(text: string, kind?: "error" | "info" | "success" | "warning"): void;
@@ -292,13 +293,17 @@ export const useStore = create<State>((set, get) => ({
         active: path,
         view: "repo",
         repos: { ...s.repos, [path]: s.repos[path] ?? { ...emptyRepo(graphLimit()), info } },
-        selection: { ...s.selection, [path]: s.selection[path] ?? { kind: "wip" } },
         center: { ...s.center, [path]: s.center[path] ?? { kind: "graph" } },
       });
       void get().setG("recent", recent);
       void get().setG("tabs", tabs.filter((t) => t !== NEW_TAB));
       api.watch(path).catch(() => {});
       await get().refresh(path);
+      // A repository opens on its uncommitted changes, if it has any.
+      if (get().selection[path] === undefined) {
+        const changed = (get().repos[path]?.status?.files.length ?? 0) > 0;
+        set((s) => ({ selection: { ...s.selection, [path]: changed ? { kind: "wip" } : null } }));
+      }
     } catch (e) {
       get().toast(String(e), "error");
     }
@@ -362,7 +367,7 @@ export const useStore = create<State>((set, get) => ({
     set((s) => ({
       selection: { ...s.selection, [repo]: sel },
       center: { ...s.center, [repo]: { kind: "graph" } },
-      drawer: window.innerWidth < 1280 ? "right" : s.drawer,
+      drawer: !sel ? null : window.innerWidth < 1280 ? "right" : s.drawer,
     }));
   },
 
