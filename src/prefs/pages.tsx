@@ -94,7 +94,7 @@ export function UiCustomization() {
       <DateRow k="dateTimeFormat" label="Date/time format" />
       <DateRow k="dateVerboseFormat" label="Date verbose format" />
       <h2>Graph</h2>
-      <Toggle k="useAvatars" label="Show avatars" help="Load Gravatar images for commit authors. When off, author initials are shown instead." />
+      <Toggle k="useAvatars" label="Show avatars" help="Loads author pictures from Gravatar (sent a hash of each author's email) and GitHub (sent the account of GitHub no-reply addresses). When off, author initials are shown and nothing is requested." />
       <Toggle k="hoverHighlight" label="Highlight associated rows when hovering over a branch" />
       <Select k="graphLineStyle" label="Line style" options={[["angular", "Right angles (rounded)"], ["curved", "Curves"]]} />
       <Toggle k="pinTrunk" label="Keep main branches in fixed columns" help="Main branches get their own columns on the left; feature branches get columns to the right and curve into the branch they came from." />

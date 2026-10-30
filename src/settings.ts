@@ -32,7 +32,7 @@ export const GLOBAL_DEFAULTS = {
   dateWordFormat: "D MMMM YYYY",
   dateTimeFormat: "DD/MM/YYYY @ HH:mm",
   dateVerboseFormat: "dddd, D MMMM YYYY [at] HH:mm",
-  useAvatars: true,
+  useAvatars: false,
   hoverHighlight: true,
   branchVisibility: "all" as "all" | "local" | "current",
   pinTrunk: true,
