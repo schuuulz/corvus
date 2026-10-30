@@ -33,6 +33,7 @@ export const GLOBAL_DEFAULTS = {
   dateTimeFormat: "DD/MM/YYYY @ HH:mm",
   dateVerboseFormat: "dddd, D MMMM YYYY [at] HH:mm",
   useAvatars: false,
+  hideTrackedRemotes: false,
   hoverHighlight: true,
   branchVisibility: "all" as "all" | "local" | "current",
   pinTrunk: true,
@@ -102,6 +103,9 @@ export const REPO_DEFAULTS = {
   issueTracker: "",
   /** Commit table column widths sized in this repository (see CommitGraph). */
   colWidths: {} as Record<string, number>,
+  /** Left-panel sections (by id) and folders (by key) the user closed. */
+  collapsedSections: [] as string[],
+  collapsedFolders: [] as string[],
 };
 
 export type GlobalSettings = typeof GLOBAL_DEFAULTS;

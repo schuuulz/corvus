@@ -70,10 +70,10 @@ export function StatusBadge({ code, conflicted }: { code: string; conflicted?: b
   return <span className={`st ${cls}`}>{conflicted ? "!" : code}</span>;
 }
 
-interface TreeNode<T> { name: string; path: string; children: Map<string, TreeNode<T>>; item?: T }
+export interface TreeNode<T> { name: string; path: string; children: Map<string, TreeNode<T>>; item?: T }
 
-/** Renders path-keyed items as a collapsible directory tree. */
-export function FileTree<T>({ items, pathOf, render }: { items: T[]; pathOf: (t: T) => string; render: (t: T, name: string, depth: number) => ReactNode }) {
+/** Groups items into a tree by their "/"-separated paths. */
+export function buildTree<T>(items: T[], pathOf: (t: T) => string): TreeNode<T> {
   const root: TreeNode<T> = { name: "", path: "", children: new Map() };
   for (const it of items) {
     const parts = pathOf(it).split("/");
@@ -85,6 +85,12 @@ export function FileTree<T>({ items, pathOf, render }: { items: T[]; pathOf: (t:
     });
     node.item = it;
   }
+  return root;
+}
+
+/** Renders path-keyed items as a collapsible directory tree. */
+export function FileTree<T>({ items, pathOf, render }: { items: T[]; pathOf: (t: T) => string; render: (t: T, name: string, depth: number) => ReactNode }) {
+  const root = buildTree(items, pathOf);
   return <>{[...root.children.values()].map((n) => <TreeBranch key={n.path} node={n} depth={0} render={render} />)}</>;
 }
 
@@ -108,6 +114,37 @@ function TreeBranch<T>({ node, depth, render }: { node: TreeNode<T>; depth: numb
         <span className="fname">{label}</span>
       </div>
       {open && [...n.children.values()].map((c) => <TreeBranch key={c.path} node={c} depth={depth + 1} render={render} />)}
+    </>
+  );
+}
+
+/**
+ * Slides `children` open and closed. They mount the first time it opens, so a
+ * list that was never opened costs nothing, and stay mounted to animate out.
+ */
+export function Collapse({ open, children }: { open: boolean; children: ReactNode }) {
+  const [mounted, setMounted] = useState(open);
+  if (open && !mounted) setMounted(true);
+  return (
+    <div className={`collapse${open ? " open" : ""}`}>
+      <div className="collapse-inner">{mounted && children}</div>
+    </div>
+  );
+}
+
+/**
+ * `text` with the first case-insensitive occurrence of `query` marked. Names
+ * come from repositories, so this only ever produces text nodes.
+ */
+export function Highlight({ text, query }: { text: string; query: string }) {
+  const at = query ? text.toLowerCase().indexOf(query.toLowerCase()) : -1;
+  if (at < 0) return <>{text}</>;
+  const end = at + query.length;
+  return (
+    <>
+      {text.slice(0, at)}
+      <mark className="match">{text.slice(at, end)}</mark>
+      {text.slice(end)}
     </>
   );
 }
