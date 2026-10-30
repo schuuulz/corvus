@@ -44,7 +44,7 @@ pub async fn configure_tokens(integrations: Vec<IntegrationRef>) -> Result<()> {
         .filter_map(|i| {
             let host = integ::default_host(i.kind, &i.host);
             let token = system::secret_get(&integ::secret_key(i.kind, &host))?;
-            Some((host, integ::git_username(i.kind).to_string(), token))
+            Some(cli::HostToken { username: integ::git_username(i.kind).to_string(), host, token })
         })
         .collect();
     cli::set_tokens(tokens);
@@ -74,7 +74,7 @@ pub async fn clear_activity_log() -> Result<()> {
 
 #[tauri::command]
 pub async fn submodule_update(repo: String) -> Result<()> {
-    cli::run(&repo, &["submodule", "update", "--init", "--recursive"]).map(|_| ())
+    cli::run_remote(&repo, &["submodule", "update", "--init", "--recursive"], cli::Reach::Submodules).map(|_| ())
 }
 
 #[tauri::command]

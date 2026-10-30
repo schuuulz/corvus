@@ -1,6 +1,6 @@
 //! End-to-end tests of the git backend against throwaway repositories.
 
-use corvus_lib::git::{self, commit, conflict, ext, graph, ops, outcome::{self, OpStatus}, refs, status};
+use corvus_lib::git::{self, cli, commit, conflict, ext, graph, ops, outcome::{self, OpStatus}, refs, status};
 use std::fs;
 use std::process::Command;
 
@@ -380,4 +380,27 @@ fn cherry_pick_refuses_ids_that_are_not_hex() {
     commit_all(&p, "one");
     assert!(outcome::cherry_pick(&p, "ééééééé").is_err());
     assert!(outcome::revert(&p, "--abort").is_err());
+}
+
+#[test]
+fn local_operations_hide_integration_tokens_from_hooks() {
+    let (_d, p) = repo();
+    let token = "corvus-test-token";
+    cli::set_tokens(vec![cli::HostToken { host: "github.com".into(), username: "x-access-token".into(), token: token.into() }]);
+    let hook = format!("{p}/.git/hooks/pre-commit");
+    fs::write(&hook, "#!/bin/sh
+env > .git/hook-env
+").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&hook, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    write(&p, "a.txt", "one
+");
+    commit_all(&p, "one");
+    let env = read(&p, ".git/hook-env");
+    assert!(env.contains("GIT_EDITOR"), "the hook ran under Corvus' git");
+    assert!(!env.contains(token), "a commit hook never sees integration tokens");
 }

@@ -1,7 +1,8 @@
 //! Ref-changing operations, remotes, stashes, interactive rebase, undo and
 //! config. All of these go through the git CLI.
 
-use super::{cli, commit_id, operand, Result};
+use super::cli::{self, Reach};
+use super::{commit_id, operand, Result};
 use git2::Oid;
 use serde::{Deserialize, Serialize};
 
@@ -117,7 +118,7 @@ pub fn stash_action(path: &str, action: &str, index: usize) -> Result<()> {
 // --- remotes ---------------------------------------------------------------
 
 pub fn fetch(path: &str, progress: impl FnMut(&str)) -> Result<()> {
-    ok(cli::run_streaming(path, &["fetch", "--all", "--prune", "--progress"], progress))
+    ok(cli::run_remote_streaming(path, &["fetch", "--all", "--prune", "--progress"], Reach::Remotes, progress))
 }
 
 /// How `pull` integrates the upstream changes.
@@ -146,7 +147,7 @@ impl PullMode {
 
 pub fn pull(path: &str, mode: PullMode, progress: impl FnMut(&str)) -> Result<()> {
     let args = [&["pull", "--progress"], mode.flags()].concat();
-    ok(cli::run_streaming(path, &args, progress))
+    ok(cli::run_remote_streaming(path, &args, Reach::Remotes, progress))
 }
 
 pub fn push(path: &str, force: bool, progress: impl FnMut(&str)) -> Result<()> {
@@ -173,15 +174,17 @@ pub fn push(path: &str, force: bool, progress: impl FnMut(&str)) -> Result<()> {
         args.extend(["-u".into(), remote.to_string(), branch.to_string()]);
     }
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
-    ok(cli::run_streaming(path, &args, progress))
+    ok(cli::run_remote_streaming(path, &args, Reach::Remotes, progress))
 }
 
 pub fn push_branch(path: &str, remote: &str, branch: &str, progress: impl FnMut(&str)) -> Result<()> {
-    ok(cli::run_streaming(path, &["push", "--progress", "-u", operand(remote)?, operand(branch)?], progress))
+    let remote = operand(remote)?;
+    ok(cli::run_remote_streaming(path, &["push", "--progress", "-u", remote, operand(branch)?], Reach::Remote(remote), progress))
 }
 
 pub fn delete_remote_branch(path: &str, remote: &str, branch: &str) -> Result<()> {
-    ok(cli::run(path, &["push", operand(remote)?, "--delete", operand(branch)?]))
+    let remote = operand(remote)?;
+    ok(cli::run_remote(path, &["push", remote, "--delete", operand(branch)?], Reach::Remote(remote)))
 }
 
 pub fn add_remote(path: &str, name: &str, url: &str) -> Result<()> {
@@ -199,7 +202,7 @@ pub fn clone(url: &str, dest: &str, progress: impl FnMut(&str)) -> Result<()> {
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_else(|| ".".into());
     std::fs::create_dir_all(&parent)?;
-    ok(cli::run_streaming(&parent, &["clone", "--progress", "--", url, dest], progress))
+    ok(cli::run_remote_streaming(&parent, &["clone", "--progress", "--", url, dest], Reach::Url(url), progress))
 }
 
 pub fn init(path: &str) -> Result<()> {
