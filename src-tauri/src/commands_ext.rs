@@ -239,6 +239,11 @@ pub async fn conflict_check(repo: String, patterns: Vec<String>, preferred: Opti
     ext::conflict_check(&repo, &patterns, preferred.as_deref())
 }
 
+#[tauri::command]
+pub async fn conflict_preview(repo: String, base: String, file: String) -> Result<git::conflict::ConflictVersions> {
+    ext::conflict_preview(&repo, &base, &file)
+}
+
 // --- integrations ------------------------------------------------------------
 
 #[tauri::command]

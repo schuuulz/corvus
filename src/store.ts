@@ -17,6 +17,7 @@ export type CenterView =
   | { kind: "graph" }
   | { kind: "diff"; file: string; oldFile?: string | null; mode: DiffMode; oid?: string }
   | { kind: "merge"; file: string }
+  | { kind: "conflictPreview"; file: string; base: string }
   | { kind: "history"; file: string }
   | { kind: "blame"; file: string };
 

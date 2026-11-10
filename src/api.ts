@@ -191,6 +191,7 @@ export const ext = {
   sparseSet: (repo: string, paths: string[]) => call<void>("sparse_set", { repo, paths }),
   sparseAction: (repo: string, action: "disable" | "reapply") => call<void>("sparse_action", { repo, action }),
   conflictCheck: (repo: string, patterns: string[], preferred: string | null) => call<ConflictCheck>("conflict_check", { repo, patterns, preferred }),
+  conflictPreview: (repo: string, base: string, file: string) => call<ConflictVersions>("conflict_preview", { repo, base, file }),
   connect: (kind: IntegrationKind, host: string, token: string) => call<Account>("integration_connect", { kind, host, token }),
   disconnect: (kind: IntegrationKind, host: string) => call<void>("integration_disconnect", { kind, host }),
   pulls: (kind: IntegrationKind, host: string, repo: string) => call<PullRequest[]>("integration_pulls", { kind, host, repo }),
