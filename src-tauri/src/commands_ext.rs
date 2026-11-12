@@ -42,7 +42,9 @@ pub async fn configure_tokens(integrations: Vec<IntegrationRef>) -> Result<()> {
     let tokens = integrations
         .into_iter()
         .filter_map(|i| {
-            let host = integ::default_host(i.kind, &i.host);
+            // The host lands in a git `-c credential.https://<host>.helper=…`
+            // argument: only a bare host may get there.
+            let host = integ::checked_host(i.kind, &i.host).ok()?;
             let token = system::secret_get(&integ::secret_key(i.kind, &host))?;
             Some(cli::HostToken { username: integ::git_username(i.kind).to_string(), host, token })
         })
@@ -237,6 +239,11 @@ pub async fn sparse_action(repo: String, action: String) -> Result<()> {
 #[tauri::command]
 pub async fn conflict_check(repo: String, patterns: Vec<String>, preferred: Option<String>) -> Result<ext::ConflictCheck> {
     ext::conflict_check(&repo, &patterns, preferred.as_deref())
+}
+
+#[tauri::command]
+pub async fn conflict_preview(repo: String, base: String, file: String) -> Result<git::conflict::ConflictVersions> {
+    ext::conflict_preview(&repo, &base, &file)
 }
 
 // --- integrations ------------------------------------------------------------

@@ -201,6 +201,15 @@ fn predicts_conflicts_with_base() {
     let c = ext::conflict_check(&p, &["**".into()], Some("main")).unwrap();
     assert_eq!(c.base.as_deref(), Some("main"));
     assert_eq!(c.files, vec!["f.txt".to_string()]);
+
+    let v = ext::conflict_preview(&p, "main", "f.txt").unwrap();
+    assert_eq!((v.base.as_str(), v.ours.as_str(), v.theirs.as_str()), ("base
+", "topic
+", "main
+"));
+    assert!(v.merged.contains("<<<<<<<") && v.merged.contains(">>>>>>>"));
+    assert!(ext::conflict_preview(&p, "main", "missing.txt").is_err());
+    assert!(ext::conflict_preview(&p, "main", "../f.txt").is_err());
 }
 #[test]
 fn outcomes_report_checkout_conflicts_and_noop() {

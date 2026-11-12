@@ -100,15 +100,16 @@ function ConflictChip() {
     };
   }, [repo, head, status, enabledGlobal, enabledRepo, patterns, set]);
   if (!enabledGlobal || !enabledRepo || !check?.base || !check.files.length) return null;
+  const base = check.base;
   return (
     <button
       className="chip warn"
       style={{ cursor: "pointer" }}
-      title="Predicted merge conflicts"
+      title={`Predicted merge conflicts with ${base}`}
       onClick={(e) =>
         openMenu(e, [
-          { label: `Conflicts with ${check.base}:`, disabled: true },
-          ...check.files.map((f) => ({ label: f, action: () => useStore.getState().setCenter({ kind: "diff", file: f, mode: "unstaged" as const }) })),
+          { label: `Conflicts with ${base}:`, disabled: true },
+          ...check.files.map((f) => ({ label: f, action: () => useStore.getState().setCenter({ kind: "conflictPreview", file: f, base }) })),
         ])
       }
     >
@@ -207,7 +208,7 @@ export function Toolbar() {
                     await A.push(true);
                 },
               },
-              ...(head && A.pullRequestHost() ? [{ label: "Create pull request…", action: () => A.openPullRequest(head) }] : []),
+              ...(head ? A.createPullRequestItem(head) : []),
             ])
           }
         >
@@ -315,7 +316,7 @@ function RestartToUpdate() {
   const update = useStore((s) => s.update);
   if (update?.phase !== "postponed") return null;
   return (
-    <button className="small primary statusbar-update" title={t("update.available", { version: update.version })} onClick={installUpdate}>
+    <button className="small primary statusbar-update" title={t("update.available", { version: update.release.version })} onClick={installUpdate}>
       <RefreshCw size={11} /> {t("update.restart")}
     </button>
   );
