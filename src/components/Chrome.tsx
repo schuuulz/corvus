@@ -208,7 +208,7 @@ export function Toolbar() {
                     await A.push(true);
                 },
               },
-              ...(head && A.pullRequestHost() ? [{ label: "Create pull request…", action: () => A.openPullRequest(head) }] : []),
+              ...(head ? A.createPullRequestItem(head) : []),
             ])
           }
         >

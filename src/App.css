@@ -482,6 +482,31 @@ mark.match { background: var(--active); color: var(--text); border-radius: 2px; 
 .modal-note svg { flex: none; color: var(--mod); }
 .modal-note.info { background: var(--active); }
 .modal-note.info svg { color: var(--accent-hi); }
+
+/* Pull / merge request dialog: what merges where, then the one it opened. */
+.pr-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.pr-head h3 { margin: 0 0 2px; }
+.pr-head p { margin: 0; overflow-wrap: anywhere; }
+.pr-head-icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: var(--accent-hi); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.pr-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-2); }
+.pr-flow-arrow { flex: none; color: var(--muted); }
+.pr-branch { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; padding: 3px 9px; border: 1px solid var(--ref-chip-border); border-radius: 999px; background: var(--ref-chip-bg); color: var(--ref-chip-text); font: 12px var(--font-mono); transition: border-color var(--ease), box-shadow var(--ease); }
+.pr-branch > svg { flex: none; }
+.pr-branch-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-branch.picker { cursor: pointer; }
+.pr-branch.picker:hover { border-color: var(--accent); }
+.pr-branch.picker:focus-within { border-color: var(--accent); box-shadow: var(--glow); }
+.pr-branch select, .pr-branch select:focus-visible { width: auto; max-width: 260px; padding: 0; border: none; border-radius: 0; background: transparent; box-shadow: none; color: inherit; font: inherit; appearance: none; cursor: pointer; }
+.pr-branch select option { background: var(--panel); color: var(--text); }
+.pr-created { width: min(440px, 100%); text-align: center; }
+.pr-created-icon { display: grid; place-items: center; width: 48px; height: 48px; margin: 4px auto 14px; border-radius: 50%; color: var(--on-accent); background: var(--accent); box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent); animation: badge-pop 200ms ease-out; }
+.pr-created h3 { margin-bottom: 4px; }
+.pr-created-title { margin: 0 0 14px; overflow-wrap: anywhere; }
+.pr-created .pr-flow { justify-content: center; }
+.pr-created .modal-actions { flex-wrap: wrap; justify-content: center; }
+@media (prefers-reduced-motion: reduce) {
+  .pr-created-icon { animation: none; }
+}
 .palette { width: min(620px, 100%); background: var(--raised); border: 1px solid var(--border-strong); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); animation: pop 120ms ease-out; }
 .palette input { border: none !important; border-bottom: 1px solid var(--border) !important; border-radius: 0 !important; padding: 14px 16px !important; font-size: 15px; box-shadow: none !important; background: transparent !important; }
 .palette-list { max-height: 52vh; overflow: auto; padding: 5px; }

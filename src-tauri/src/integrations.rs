@@ -115,8 +115,7 @@ impl Client {
         let status = res.status();
         let body: Value = res.json().await.unwrap_or(Value::Null);
         if !status.is_success() {
-            let m = body.get("message").or_else(|| body.get("error")).map(|m| m.to_string()).unwrap_or_default();
-            return msg(format!("{} {}: {}", status.as_u16(), status.canonical_reason().unwrap_or(""), m.trim_matches('"')));
+            return msg(format!("{} {}: {}", status.as_u16(), status.canonical_reason().unwrap_or(""), error_message(&body)));
         }
         Ok(body)
     }
@@ -127,6 +126,37 @@ impl Client {
 
     async fn post(&self, path: &str, body: Value) -> Result<Value> {
         self.send(self.req(reqwest::Method::POST, path).json(&body)).await
+    }
+}
+
+/// Longest provider explanation shown; the rest is cut.
+const MAX_ERROR_CHARS: usize = 400;
+
+/// The provider's explanation of a failed request, as one readable line.
+/// GitHub sends a message with optional `errors` details; GitLab a string,
+/// a list, or a map of field → messages; OAuth failures an `error` code.
+fn error_message(body: &Value) -> String {
+    let headline = ["message", "error_description", "error"].iter().find_map(|k| body.get(*k)).map(flatten).unwrap_or_default();
+    let details: Vec<String> = body["errors"]
+        .as_array()
+        .map(|errors| errors.iter().filter_map(|e| e.get("message")).map(flatten).filter(|m| !m.is_empty()).collect())
+        .unwrap_or_default();
+    let text = if details.is_empty() { headline } else { format!("{headline}: {}", details.join("; ")) };
+    if text.chars().count() > MAX_ERROR_CHARS {
+        format!("{}…", text.chars().take(MAX_ERROR_CHARS).collect::<String>())
+    } else {
+        text
+    }
+}
+
+/// Joins GitLab's nested messages: `{"title": ["can't be blank"]}` → "title can't be blank".
+fn flatten(value: &Value) -> String {
+    match value {
+        Value::String(text) => text.clone(),
+        Value::Array(items) => items.iter().map(flatten).filter(|m| !m.is_empty()).collect::<Vec<_>>().join("; "),
+        Value::Object(fields) => fields.iter().map(|(field, m)| format!("{field} {}", flatten(m))).collect::<Vec<_>>().join("; "),
+        Value::Null => String::new(),
+        other => other.to_string(),
     }
 }
 
@@ -420,6 +450,26 @@ mod tests {
         }
         assert!(github.url.ends_with("/pull/7"));
         assert!(gitlab.url.ends_with("/merge_requests/7"));
+    }
+
+    #[test]
+    fn reads_provider_error_messages() {
+        assert_eq!(error_message(&json!({ "message": "404 Project Not Found" })), "404 Project Not Found");
+        assert_eq!(
+            error_message(&json!({ "message": ["Another open merge request already exists for this source branch: !12"] })),
+            "Another open merge request already exists for this source branch: !12"
+        );
+        assert_eq!(
+            error_message(&json!({ "message": { "title": ["can't be blank"], "target_branch": ["is invalid", "is missing"] } })),
+            "target_branch is invalid; is missing; title can't be blank"
+        );
+        assert_eq!(
+            error_message(&json!({ "message": "Validation Failed", "errors": [{ "message": "A pull request already exists for o:feat." }] })),
+            "Validation Failed: A pull request already exists for o:feat."
+        );
+        assert_eq!(error_message(&json!({ "error": "insufficient_scope" })), "insufficient_scope");
+        assert_eq!(error_message(&Value::Null), "");
+        assert_eq!(error_message(&json!({ "message": "x".repeat(1000) })).chars().count(), MAX_ERROR_CHARS + 1);
     }
 
     #[test]
