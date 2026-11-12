@@ -100,15 +100,16 @@ function ConflictChip() {
     };
   }, [repo, head, status, enabledGlobal, enabledRepo, patterns, set]);
   if (!enabledGlobal || !enabledRepo || !check?.base || !check.files.length) return null;
+  const base = check.base;
   return (
     <button
       className="chip warn"
       style={{ cursor: "pointer" }}
-      title="Predicted merge conflicts"
+      title={`Predicted merge conflicts with ${base}`}
       onClick={(e) =>
         openMenu(e, [
-          { label: `Conflicts with ${check.base}:`, disabled: true },
-          ...check.files.map((f) => ({ label: f, action: () => useStore.getState().setCenter({ kind: "diff", file: f, mode: "unstaged" as const }) })),
+          { label: `Conflicts with ${base}:`, disabled: true },
+          ...check.files.map((f) => ({ label: f, action: () => useStore.getState().setCenter({ kind: "conflictPreview", file: f, base }) })),
         ])
       }
     >

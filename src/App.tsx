@@ -13,7 +13,7 @@ import RefsPanel from "./components/RefsPanel";
 import CommitDetail from "./components/CommitDetail";
 import StagingPanel from "./components/StagingPanel";
 import DiffView from "./components/DiffView";
-import MergeEditor from "./components/MergeEditor";
+import MergeEditor, { ConflictPreview } from "./components/MergeEditor";
 import InteractiveRebase from "./components/InteractiveRebase";
 import TerminalDock from "./components/Terminal";
 import NewTab from "./components/NewTab";
@@ -35,6 +35,8 @@ function Center() {
       return <DiffView file={center.file} oldFile={center.oldFile} mode={center.mode} oid={center.oid} />;
     case "merge":
       return <MergeEditor key={center.file} file={center.file} />;
+    case "conflictPreview":
+      return <ConflictPreview key={`${center.base}:${center.file}`} file={center.file} base={center.base} />;
     case "history":
       return <FileHistory file={center.file} />;
     case "blame":

@@ -1,6 +1,7 @@
 //! Repository extras: git config access, Gitflow, LFS, sparse checkout,
 //! proactive conflict detection and text encodings.
 
+use super::conflict::ConflictVersions;
 use super::{cli, msg, operand, Result};
 use git2::BranchType;
 use serde::Serialize;
@@ -291,6 +292,36 @@ pub fn conflict_check(repo_path: &str, patterns: &[String], preferred: Option<&s
     let (clean, out) = cli::run_status(repo_path, &["merge-tree", "--write-tree", "--name-only", "--no-messages", "HEAD", operand(&base)?])?;
     let files = if clean { vec![] } else { out.lines().skip(1).filter(|l| !l.is_empty()).map(String::from).collect() };
     Ok(ConflictCheck { base: Some(base), files })
+}
+
+/// The predicted conflict in `file` when merging `base` into HEAD, computed
+/// in memory by `merge-tree` without touching the index or working tree.
+/// `merged` is the file as the merge would leave it, conflict markers included.
+pub fn conflict_preview(repo_path: &str, base: &str, file: &str) -> Result<ConflictVersions> {
+    let path = super::repo_relative(file)?;
+    let (_, out) = cli::run_status(repo_path, &["merge-tree", "--write-tree", "--no-messages", "HEAD", operand(base)?])?;
+    let mut lines = out.lines();
+    let Some(tree) = lines.next() else { return msg("merge-tree returned no tree") };
+    let repo = super::open(repo_path)?;
+    let mut stages: [Option<git2::Oid>; 3] = [None; 3];
+    // Each conflicted-file line reads `<mode> <oid> <stage>\t<path>`.
+    for line in lines.take_while(|l| !l.is_empty()) {
+        let Some((meta, entry)) = line.split_once('\t') else { continue };
+        let mut meta = meta.split(' ').skip(1);
+        let (Some(oid), Some(stage)) = (meta.next(), meta.next()) else { continue };
+        if let (true, Ok(stage @ 1..=3)) = (entry == file, stage.parse::<usize>()) {
+            stages[stage - 1] = Some(git2::Oid::from_str(oid)?);
+        }
+    }
+    if stages.iter().all(Option::is_none) {
+        return msg(format!("{file} has no predicted conflict with {base}"));
+    }
+    let text = |oid: Option<git2::Oid>| -> Result<String> {
+        let Some(oid) = oid else { return Ok(String::new()) };
+        Ok(String::from_utf8_lossy(repo.find_blob(oid)?.content()).into_owned())
+    };
+    let merged = repo.find_tree(git2::Oid::from_str(tree)?)?.get_path(path).ok().map(|e| e.id());
+    Ok(ConflictVersions { base: text(stages[0])?, ours: text(stages[1])?, theirs: text(stages[2])?, merged: text(merged)? })
 }
 
 // --- encodings -------------------------------------------------------------

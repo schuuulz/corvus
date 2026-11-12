@@ -121,6 +121,7 @@ pub fn run() {
             sparse_set,
             sparse_action,
             conflict_check,
+            conflict_preview,
             integration_connect,
             integration_disconnect,
             integration_pulls,

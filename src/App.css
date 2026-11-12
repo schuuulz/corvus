@@ -410,10 +410,23 @@ mark.match { background: var(--active); color: var(--text); border-radius: 2px; 
 .pane > section, .pane > div:last-child { flex: 1; min-height: 0; }
 .pane.output { flex: 1; }
 .pane-title { padding: 4px 10px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--muted); background: var(--panel-2); }
-.pane-title.ours { color: var(--ren); }
-.pane-title.theirs { color: var(--accent-2); }
-.merge-blocks { display: flex; flex-wrap: wrap; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--border); }
-.block-chip { display: flex; align-items: center; gap: 4px; background: var(--panel-2); padding: 2px 4px 2px 10px; border-radius: 12px; font-size: 12px; }
+.pane-title.ours { color: var(--ren); background: color-mix(in srgb, var(--ren) 12%, var(--panel-2)); }
+.pane-title.theirs { color: var(--accent-2); background: color-mix(in srgb, var(--accent-2) 12%, var(--panel-2)); }
+.merge-blocks { display: flex; flex-wrap: wrap; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--border); max-height: 30%; overflow: auto; }
+.block-chip { display: flex; align-items: center; gap: 6px; background: var(--panel-2); padding: 2px 4px 2px 10px; border-radius: 12px; font-size: 12px; border: 1px solid transparent; transition: border-color 0.15s, background 0.15s; }
+.block-chip.current { border-color: var(--mod); background: var(--warn-bg); }
+.block-chip button.link { color: var(--text); font-size: 12px; }
+.block-chip button.choice-ours { color: var(--ren); }
+.block-chip button.choice-theirs { color: var(--accent-2); }
+.block-nav { display: inline-flex; align-items: center; gap: 2px; }
+.block-nav-pos { min-width: 42px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text-2); }
+/* Monaco decorations for conflict blocks (see MergeEditor.tsx). */
+.cf-ours { background: color-mix(in srgb, var(--ren) 16%, transparent); }
+.cf-theirs { background: color-mix(in srgb, var(--accent-2) 14%, transparent); }
+.cf-base { background: color-mix(in srgb, var(--muted) 12%, transparent); }
+.cf-marker { background: color-mix(in srgb, var(--mod) 18%, transparent); }
+.cf-gutter { border-left: 3px solid color-mix(in srgb, var(--mod) 45%, transparent); margin-left: 3px; }
+.cf-gutter.current { border-left-color: var(--mod); }
 
 .list { flex: 1; overflow: auto; }
 .list-row { display: flex; gap: 12px; padding: 6px 12px; cursor: pointer; align-items: center; }
