@@ -1,20 +1,13 @@
 import { useEffect } from "react";
+import { ArrowRight, Check, ChevronRight } from "lucide-react";
 import { t } from "../i18n";
-import { UpdateState, useStore } from "../store";
+import { NoteSection } from "../releaseNotes";
+import { UpdateRelease, UpdateState, useStore } from "../store";
 import { installUpdate, postponeUpdate } from "../updater";
+import Logo from "./Logo";
 
 /** The phases the overlay shows; a postponed update lives in the status bar. */
 type ShownUpdate = Exclude<UpdateState, { phase: "postponed" }>;
-
-// The scene: a graph lane drawn left to right as the download progresses,
-// with a raven flying along it. Once downloaded, the raven lands on the last
-// commit, which becomes the new version's label.
-const WIDTH = 320;
-const LANE_Y = 52;
-const START = 20;
-const END = 300;
-const NODES = 5;
-const nodeX = (i: number) => START + ((END - START) * i) / (NODES - 1);
 
 const megabytes = (bytes: number) => `${(bytes / 1_048_576).toFixed(1)} MB`;
 
@@ -40,48 +33,96 @@ function statusOf(u: ShownUpdate): string {
   }
 }
 
-/** An original raven silhouette, facing right, about 34×20 around its body. */
-function Raven() {
+/**
+ * How the ring around the mark reads: still while the update is offered,
+ * filling with the download, spinning while the amount of work is unknown,
+ * closed once installed, red when it failed.
+ */
+type Ring = "idle" | "progress" | "busy" | "done" | "failed";
+
+function ringOf(u: ShownUpdate): Ring {
+  switch (u.phase) {
+    case "available":
+      return "idle";
+    case "downloading":
+      return u.total ? "progress" : "busy";
+    case "installing":
+      return "busy";
+    case "relaunching":
+      return "done";
+    case "failed":
+      return "failed";
+  }
+}
+
+const RING_RADIUS = 46;
+
+function UpdateEmblem({ update }: { update: ShownUpdate }) {
+  const ring = ringOf(update);
+  const filled = ring === "progress" ? progressOf(update) ?? 0 : 1;
   return (
-    <>
-      <path className="raven-tail" d="M-12 2 L-20 -3 L-19 5 Z" />
-      <path className="raven-body" d="M-13 2 C-7 -4 4 -4 9 -2 L16 -4 L13 -0.5 C14 1 13 3 10 3 C5 7 -6 7 -13 2 Z" />
-      <path className="raven-wing" d="M-2 -2 C-7 -12 -15 -13 -19 -9 C-13 -8 -8 -5 -6 0 Z" />
-      <circle className="raven-eye" cx={10} cy={-1.5} r={0.9} />
-    </>
+    <div className={`update-emblem ${ring}`}>
+      <svg className="update-ring" viewBox="0 0 100 100" aria-hidden>
+        <circle className="update-ring-track" cx={50} cy={50} r={RING_RADIUS} />
+        {/* Starts at twelve o'clock and runs clockwise. */}
+        <circle className="update-ring-arc" cx={50} cy={50} r={RING_RADIUS} pathLength={1} strokeDashoffset={1 - filled} transform="rotate(-90 50 50)" />
+      </svg>
+      <Logo size={58} />
+      {ring === "done" && (
+        <span className="update-badge" aria-hidden>
+          <Check size={13} strokeWidth={3} />
+        </span>
+      )}
+    </div>
   );
 }
 
-function Scene({ update }: { update: ShownUpdate }) {
-  const progress = progressOf(update);
-  const landed = update.phase === "installing" || update.phase === "relaunching";
-  const ravenX = START + (END - START) * (progress ?? 0);
+function VersionChange({ release }: { release: UpdateRelease }) {
   return (
-    <svg className={`update-scene${progress === null ? " indeterminate" : ""}${landed ? " landed" : ""}`} viewBox={`0 0 ${WIDTH} 80`} aria-hidden>
-      <path className="update-lane" d={`M${START} ${LANE_Y} H${END}`} />
-      <path className="update-lane-done" d={`M${START} ${LANE_Y} H${END}`} pathLength={1} strokeDashoffset={1 - (progress ?? 0)} />
-      {Array.from({ length: NODES - 1 }, (_, i) => (
-        <circle key={i} className={`update-node${progress !== null && progress >= i / (NODES - 1) ? " lit" : ""}`} cx={nodeX(i)} cy={LANE_Y} r={5} />
-      ))}
-      {landed ? (
-        <g transform={`translate(${END} ${LANE_Y})`}>
-          <g className="update-version">
-            <rect x={-26} y={-9} width={52} height={18} rx={9} />
-            <text textAnchor="middle" dy="0.35em">
-              v{update.version}
-            </text>
-          </g>
-        </g>
-      ) : (
-        <circle className="update-node" cx={END} cy={LANE_Y} r={5} />
-      )}
-      {/* Flies above the lane, then perches on the version label. */}
-      <g className="raven-track" style={{ transform: `translate(${landed ? END : ravenX}px, ${landed ? LANE_Y - 15 : LANE_Y - 22}px)` }}>
-        <g className="raven">
-          <Raven />
-        </g>
-      </g>
-    </svg>
+    <div className="update-versions" aria-label={t("update.from", { current: release.current, version: release.version })}>
+      <span>{release.current}</span>
+      <ArrowRight size={12} aria-hidden />
+      <span className="update-version-next">{release.version}</span>
+    </div>
+  );
+}
+
+/** A thin bar under the emblem while the update downloads and installs. */
+function DownloadProgress({ update }: { update: ShownUpdate }) {
+  const progress = progressOf(update);
+  const known = progress !== null && update.phase === "downloading";
+  return (
+    <div className="update-progress">
+      <div className={`update-bar${known ? "" : " indeterminate"}`}>
+        <span style={known ? { transform: `scaleX(${progress})` } : undefined} />
+      </div>
+      {known && <span className="update-percent">{Math.floor(progress * 100)}%</span>}
+    </div>
+  );
+}
+
+/** "What's new", closed by default. Notes come from the manifest: plain text only. */
+function ReleaseNotes({ notes }: { notes: NoteSection[] }) {
+  if (!notes.length) return null;
+  return (
+    <details className="update-notes">
+      <summary>
+        <ChevronRight size={13} aria-hidden />
+        {t("update.whatsNew")}
+      </summary>
+      <div className="update-notes-body">
+        {notes.map((section, i) => (
+          <section key={i}>
+            {section.title && <h4>{section.title}</h4>}
+            <ul>
+              {section.items.map((item, j) => (
+                <li key={j}>{item}</li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -103,20 +144,27 @@ export default function UpdateOverlay() {
   const waiting = update?.phase === "available" || update?.phase === "failed";
   usePostponeOnEscape(waiting);
   if (!update || update.phase === "postponed") return null;
-  const title = update.phase === "available" ? t("update.available", { version: update.version }) : t("update.title", { version: update.version });
+  const { release } = update;
+  const title = update.phase === "available" ? t("update.available", { version: release.version }) : t("update.title", { version: release.version });
+  const working = update.phase === "downloading" || update.phase === "installing" || update.phase === "relaunching";
   return (
     <div className="modal-back update-back">
       <div className="modal update-modal" role={waiting ? "dialog" : "status"} aria-live="polite">
+        <UpdateEmblem update={update} />
         <h3>{title}</h3>
-        <Scene update={update} />
-        <p className={update.phase === "failed" ? "error-text small" : "muted small"}>{statusOf(update)}</p>
+        <VersionChange release={release} />
+        {working && <DownloadProgress update={update} />}
+        <p className={`update-status small ${update.phase === "failed" ? "error-text" : "muted"}`}>{statusOf(update)}</p>
         {update.phase === "available" && (
-          <div className="modal-actions">
-            <button onClick={postponeUpdate}>{t("update.later")}</button>
-            <button className="primary" autoFocus onClick={installUpdate}>
-              {t("update.install")}
-            </button>
-          </div>
+          <>
+            <ReleaseNotes notes={release.notes} />
+            <div className="modal-actions">
+              <button onClick={postponeUpdate}>{t("update.later")}</button>
+              <button className="primary" autoFocus onClick={installUpdate}>
+                {t("update.install")}
+              </button>
+            </div>
+          </>
         )}
         {update.phase === "failed" && (
           <>

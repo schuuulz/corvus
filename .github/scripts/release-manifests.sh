@@ -39,8 +39,10 @@ platforms=$(
     entry darwin-x86_64 '_x64\.app\.tar\.gz$'
   } | jq -s 'add // {}'
 )
-jq -n --arg version "$version" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson platforms "$platforms" \
-  '{version: $version, pub_date: $date, platforms: $platforms}' >latest.json
+# The release's changelog, shown as plain text in the in-app update dialog.
+notes=$(gh release view "$tag" --repo "$repo" --json body --jq .body)
+jq -n --arg version "$version" --arg notes "$notes" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson platforms "$platforms" \
+  '{version: $version, notes: $notes, pub_date: $date, platforms: $platforms}' >latest.json
 
 sha256sum -- $(ls | grep -v -E '\.sig$|^latest\.json$') >SHA256SUMS.txt
 
