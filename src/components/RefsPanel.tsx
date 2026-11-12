@@ -218,12 +218,12 @@ function IssueItem({ i, filter }: { i: Issue; filter: string }) {
   return (
     <div
       className="pr-item"
-      onClick={() => A.openExternal(i.url)}
+      onClick={() => i.url && A.openExternal(i.url)}
       onContextMenu={(e) => {
         e.preventDefault();
         const slug = i.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
         useStore.getState().openMenu(e, [
-          { label: "Open in browser", action: () => A.openExternal(i.url) },
+          ...(i.url ? [{ label: "Open in browser", action: () => A.openExternal(i.url) }] : []),
           { label: "Create branch for this issue…", action: () => A.newBranch(null, `feature/${i.number}-${slug}`) },
         ]);
       }}

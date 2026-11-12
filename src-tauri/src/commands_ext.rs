@@ -42,7 +42,9 @@ pub async fn configure_tokens(integrations: Vec<IntegrationRef>) -> Result<()> {
     let tokens = integrations
         .into_iter()
         .filter_map(|i| {
-            let host = integ::default_host(i.kind, &i.host);
+            // The host lands in a git `-c credential.https://<host>.helper=…`
+            // argument: only a bare host may get there.
+            let host = integ::checked_host(i.kind, &i.host).ok()?;
             let token = system::secret_get(&integ::secret_key(i.kind, &host))?;
             Some(cli::HostToken { username: integ::git_username(i.kind).to_string(), host, token })
         })
