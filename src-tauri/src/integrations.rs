@@ -443,19 +443,29 @@ pub struct RemoteRef {
 }
 
 /// Parses https, scp-style and ssh:// remote URLs.
+///
+/// The host is read the way git reads it: from the authority alone (up to
+/// the first `/`, or the first `:` in scp form), then without its user
+/// info. Looking for `@` anywhere else would let a remote such as
+/// `https://evil.com/x@gitlab.corp/g/p` pass for a connected server while
+/// git pushes to another one.
 pub fn parse_remote(url: &str) -> Option<RemoteRef> {
     let url = url.trim();
-    let (host, path) = if let Some(rest) = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://")) {
-        let rest = rest.rsplit_once('@').map(|(_, r)| r).unwrap_or(rest);
+    let (authority, path) = if let Some(rest) = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://")) {
         rest.split_once('/')?
     } else if let Some(rest) = url.strip_prefix("ssh://") {
-        let rest = rest.split_once('@').map(|(_, r)| r).unwrap_or(rest);
-        let (h, p) = rest.split_once('/')?;
-        (h.split(':').next()?, p)
+        rest.split_once('/')?
     } else {
-        let rest = url.split_once('@').map(|(_, r)| r).unwrap_or(url);
-        rest.split_once(':')?
+        // scp form: `[user@]host:path`, unless a `/` comes first (a local path).
+        let (authority, path) = url.split_once(':')?;
+        if authority.contains('/') {
+            return None;
+        }
+        (authority, path)
     };
+    let host = authority.rsplit_once('@').map_or(authority, |(_, host)| host);
+    // ssh:// may name a port, which the integration's host doesn't carry.
+    let host = if url.starts_with("ssh://") { host.split(':').next()? } else { host };
     let path = path.trim_end_matches('/').trim_end_matches(".git").to_string();
     (!host.is_empty() && path.contains('/')).then(|| RemoteRef { host: host.to_lowercase(), path })
 }
@@ -486,6 +496,11 @@ mod tests {
             Some(RemoteRef { host: "gitlab.example.com".into(), path: "group/sub/proj".into() })
         );
         assert_eq!(parse_remote("/local/path"), None);
+        assert_eq!(parse_remote("./dir:with/colon"), None, "a local path with a colon");
+        // An `@` outside the authority belongs to the path: git reaches evil.com.
+        for url in ["https://evil.com/x@gitlab.corp/g/p", "ssh://evil.com/x@github.com/o/r", "evil.com:x@github.com:o/r.git"] {
+            assert_eq!(parse_remote(url).map(|r| r.host), Some("evil.com".into()), "{url}");
+        }
     }
 
     #[test]
