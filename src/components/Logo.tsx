@@ -3,6 +3,8 @@
 // are a few steps lighter than the icon's, because at tab-bar size the icon's
 // shades vanish into the dark UI. Brand colours are fixed, not theme tokens.
 
+import { useId } from "react";
+
 // Slate shades from the darkest facet to the most lit one.
 const SLATE = { shadow: "#334155", deep: "#3b4a60", body: "#475569", lit: "#526179", crown: "#64748b" };
 const EDGE = "#94a3b8";
@@ -22,11 +24,20 @@ const FACETS: [points: string, fill: string][] = [
 ];
 const SILHOUETTE = "15,32 22,17 34,13 40,20 58,30 40,31 38,40 35,56 14,56";
 
+/**
+ * A filter id unique to each mark on screen: the tab bar and the update
+ * dialog may show one at once. React's ids carry characters that can't
+ * stand in a `url(#…)` reference, so only the safe ones are kept.
+ */
+const useGlowId = () => `corvus-glow-${useId().replace(/[^\w-]/g, "")}`;
+
 export default function Logo({ size = 64 }: { size?: number }) {
+  const glowId = useGlowId();
+  const glow = `url(#${glowId})`;
   return (
     <svg width={size} height={size} viewBox="11 9 50 50" role="img" aria-label="Corvus">
       <defs>
-        <filter id="corvus-glow" x="-200%" y="-200%" width="500%" height="500%">
+        <filter id={glowId} x="-200%" y="-200%" width="500%" height="500%">
           <feGaussianBlur stdDeviation="1.6" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
@@ -42,12 +53,12 @@ export default function Logo({ size = 64 }: { size?: number }) {
       </g>
       <circle cx="55" cy="50" r="1.7" fill={VOID} stroke={EDGE} strokeWidth="1.1" />
       <circle cx="49" cy="53" r="1.9" fill={VOID} stroke={EMERALD} strokeWidth="1.2" />
-      <circle cx="49" cy="37" r="2.1" fill={EMERALD} filter="url(#corvus-glow)" />
+      <circle cx="49" cy="37" r="2.1" fill={EMERALD} filter={glow} />
       {FACETS.map(([points, fill]) => (
         <polygon key={points} points={points} fill={fill} />
       ))}
       <polygon points={SILHOUETTE} fill="none" stroke={EDGE} strokeWidth="0.6" strokeLinejoin="round" />
-      <circle cx="32" cy="22" r="2.6" fill={EYE} filter="url(#corvus-glow)" />
+      <circle className="logo-eye" cx="32" cy="22" r="2.6" fill={EYE} filter={glow} />
       <circle cx="32.5" cy="22" r="0.9" fill={VOID} />
     </svg>
   );

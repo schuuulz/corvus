@@ -3,11 +3,12 @@ import {
   Archive, Boxes, Check, ChevronRight, CircleDot, Cloud, ExternalLink, Eye, EyeOff, GitBranch, GitPullRequest, Link2,
   PanelLeftClose, Plus, RefreshCw, Search, Settings, Tag,
 } from "lucide-react";
-import { api, Issue, LocalBranch, PullRequest, Refs, RemoteBranch } from "../api";
+import { api, IntegrationKind, Issue, LocalBranch, PullRequest, Refs, RemoteBranch } from "../api";
 import * as A from "../actions";
 import { t, t as tr } from "../i18n";
 import { usePullRequests, useIssues, useRepoIntegration } from "../hooks";
-import { useG, useRepo, useStore } from "../store";
+import { reviewRef, tReview } from "../reviews";
+import { MenuEntry, RepoIntegration, useG, useRepo, useStore } from "../store";
 import { useFlowBases, usePinnedBranches } from "./GitflowPanel";
 import { Collapsed, folderKeys, indent, RefTree, useCollapsed } from "./RefTree";
 import { Collapse, Highlight } from "./ui";
@@ -185,24 +186,27 @@ function RemoteGroup({ remote, branches, trackedBy, filter, folders }: { remote:
   );
 }
 
-function PullRequestItem({ p, filter }: { p: PullRequest; filter: string }) {
+function PullRequestItem({ p, host, filter }: { p: PullRequest; host: RepoIntegration; filter: string }) {
+  // Links the provider sent for another site come back empty (see integrations.rs).
+  const links: MenuEntry[] = p.url
+    ? [
+        { label: "Open in browser", action: () => A.openExternal(p.url) },
+        { label: "Copy link", action: () => navigator.clipboard.writeText(p.url) },
+      ]
+    : [];
   return (
     <div
       className="pr-item"
-      onClick={() => A.openExternal(p.url)}
+      onClick={() => p.url && A.openExternal(p.url)}
       onContextMenu={(e) => {
         e.preventDefault();
-        useStore.getState().openMenu(e, [
-          { label: "Open in browser", action: () => A.openExternal(p.url) },
-          { label: `Checkout ${p.source}`, action: () => A.checkout(`origin/${p.source}`, true) },
-          { label: "Copy link", action: () => navigator.clipboard.writeText(p.url) },
-        ]);
+        useStore.getState().openMenu(e, [...links, { label: `Checkout ${p.source}`, action: () => A.checkout(`${host.remoteName}/${p.source}`, true) }]);
       }}
       title={p.title}
     >
       <div className="t">
         <GitPullRequest size={13} color={p.draft ? "var(--muted)" : "var(--add)"} />
-        <span className="muted">#{p.number}</span>
+        <span className="muted">{reviewRef(host.integration.kind, p.number)}</span>
         <span><Highlight text={p.title} query={filter} /></span>
       </div>
       <div className="s">{p.author} · <Highlight text={p.source} query={filter} /> → {p.target}</div>
@@ -214,12 +218,12 @@ function IssueItem({ i, filter }: { i: Issue; filter: string }) {
   return (
     <div
       className="pr-item"
-      onClick={() => A.openExternal(i.url)}
+      onClick={() => i.url && A.openExternal(i.url)}
       onContextMenu={(e) => {
         e.preventDefault();
         const slug = i.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
         useStore.getState().openMenu(e, [
-          { label: "Open in browser", action: () => A.openExternal(i.url) },
+          ...(i.url ? [{ label: "Open in browser", action: () => A.openExternal(i.url) }] : []),
           { label: "Create branch for this issue…", action: () => A.newBranch(null, `feature/${i.number}-${slug}`) },
         ]);
       }}
@@ -235,7 +239,7 @@ function IssueItem({ i, filter }: { i: Issue; filter: string }) {
   );
 }
 
-const prFields = [(p: PullRequest) => p.title, (p: PullRequest) => `#${p.number}`, (p: PullRequest) => p.source];
+const prFields = (kind: IntegrationKind) => [(p: PullRequest) => p.title, (p: PullRequest) => reviewRef(kind, p.number), (p: PullRequest) => p.source];
 const issueFields = [(i: Issue) => i.title, (i: Issue) => `#${i.number}`];
 
 function Integrated({ filter, sections }: { filter: string; sections: Collapsed }) {
@@ -253,7 +257,8 @@ function Integrated({ filter, sections }: { filter: string; sections: Collapsed 
       </Section>
     );
   }
-  const shownPrs = prs.items && matching(prs.items, filter, ...prFields);
+  const { kind } = ri.integration;
+  const shownPrs = prs.items && matching(prs.items, filter, ...prFields(kind));
   const shownIssues = issues.items && matching(issues.items, filter, ...issueFields);
   const reload = (
     <button className="icon" title="Refresh" onClick={() => (prs.reload(), issues.reload())}>
@@ -262,11 +267,11 @@ function Integrated({ filter, sections }: { filter: string; sections: Collapsed 
   );
   return (
     <>
-      <Section id="prs" title="Pull Requests" count={prs.items?.length} icon={<GitPullRequest size={12} />} hasMatches={!!shownPrs?.length} actions={reload} sections={sections}>
+      <Section id="prs" title={tReview("pr.section", kind)} count={prs.items?.length} icon={<GitPullRequest size={12} />} hasMatches={!!shownPrs?.length} actions={reload} sections={sections}>
         {prs.error && <div className="hint-box error-text">{prs.error}</div>}
         {!prs.items && !prs.error && <div className="hint-box"><span className="spinner" /> Loading…</div>}
-        {shownPrs?.map((p) => <PullRequestItem key={p.number} p={p} filter={filter} />)}
-        {prs.items?.length === 0 && <div className="empty small">No open pull requests</div>}
+        {shownPrs?.map((p) => <PullRequestItem key={p.number} p={p} host={ri} filter={filter} />)}
+        {prs.items?.length === 0 && <div className="empty small">{tReview("pr.empty", kind)}</div>}
       </Section>
       <Section id="issues" title="Issues" count={issues.items?.length} icon={<CircleDot size={12} />} hasMatches={!!shownIssues?.length} actions={reload} sections={sections}>
         {issues.error && <div className="hint-box error-text">{issues.error}</div>}

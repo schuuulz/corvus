@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { api, ConflictCheck, DiffMode, ext, Gitflow, Graph, Integration, RemoteRef, RepoAccess, RepoInfo, Refs, SettingsData, WorkStatus } from "./api";
 import { GLOBAL_DEFAULTS, GlobalKey, GlobalSettings, REPO_DEFAULTS, RepoKey, RepoSettings } from "./settings";
 import { t } from "./i18n";
+import type { NoteSection } from "./releaseNotes";
 
 export interface RepoData {
   info: RepoInfo | null;
@@ -70,17 +71,26 @@ type Modal =
   | { kind: "rebase"; base: string | null }
   | { kind: "pr"; branch: string; base?: string };
 
+/** The release an update brings, as the updater manifest describes it. */
+export interface UpdateRelease {
+  version: string;
+  /** The version running now. */
+  current: string;
+  notes: NoteSection[];
+}
+
 /**
  * The update found on launch (see `updater.ts`): offered, postponed to the
  * status bar's "Restart to update", or on its way to being installed.
  */
-export type UpdateState =
-  | { phase: "available"; version: string }
-  | { phase: "postponed"; version: string }
-  | { phase: "downloading"; version: string; done: number; total: number | null }
-  | { phase: "installing"; version: string }
-  | { phase: "relaunching"; version: string }
-  | { phase: "failed"; version: string; message: string };
+export type UpdateState = { release: UpdateRelease } & (
+  | { phase: "available" }
+  | { phase: "postponed" }
+  | { phase: "downloading"; done: number; total: number | null }
+  | { phase: "installing" }
+  | { phase: "relaunching" }
+  | { phase: "failed"; message: string }
+);
 
 /** The hosted repository behind a local one, reached through a connected integration. */
 export interface RepoIntegration {

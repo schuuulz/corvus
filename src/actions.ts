@@ -8,9 +8,10 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { createElement } from "react";
 import { Cloud, GitPullRequest } from "lucide-react";
-import { api, ext, Gitflow, GraphRow, LocalBranch, NewPullRequest, OpOutcome, RefLabel, RemoteBranch } from "./api";
+import { api, ext, Gitflow, GraphRow, LocalBranch, NewPullRequest, OpOutcome, PullRequest, RefLabel, RemoteBranch } from "./api";
 import { fb } from "./feedback";
 import { t, tNodes } from "./i18n";
+import { reviewRef, tReview } from "./reviews";
 import { g, gitMessage, MenuEntry, NEW_TAB, r, RepoIntegration, shortSha, useStore } from "./store";
 
 const S = () => useStore.getState();
@@ -388,28 +389,33 @@ export function openPullRequest(source: string, target?: string) {
 }
 
 /**
- * Opens a pull request on the hosted repo, pushing its source branch first
- * when `push` is set, then shows it in the browser. Resolves to whether it
- * was created.
+ * Opens a pull request (a merge request on GitLab) on the hosted repo,
+ * pushing its source branch first when `push` is set. Resolves to the one
+ * created, which the dialog then shows, or null when it failed.
  */
-export async function createPullRequest(host: RepoIntegration, pr: NewPullRequest, push: boolean): Promise<boolean> {
+export async function createPullRequest(host: RepoIntegration, pr: NewPullRequest, push: boolean): Promise<PullRequest | null> {
   const { integration: i, remote, remoteName } = host;
   const created = await S().run(
-    t("pr.loading"),
+    tReview("pr.loading", i.kind),
     async (repo) => {
       if (push) await api.pushBranch(repo, remoteName, pr.source);
       return ext.createPr(i.kind, i.host, remote.path, pr);
     },
     {
       loadingDesc: `${pr.source} → ${pr.target}`,
-      success: (c) => ({ title: t("pr.created"), description: `#${c.number} ${c.title}` }),
-      error: (message) => ({ title: t("pr.failed"), description: message }),
+      success: (c) => ({ title: tReview("pr.created", i.kind), description: `${reviewRef(i.kind, c.number)} ${c.title}` }),
+      error: (message) => ({ title: tReview("pr.failed", i.kind), description: message }),
     },
   );
-  if (!created) return false;
+  if (!created) return null;
   S().set({ pullRequestsVersion: S().pullRequestsVersion + 1 });
-  void openExternal(created.url);
-  return true;
+  return created;
+}
+
+/** "Create pull request…" (or merge request) for `branch`, when the account may open one. */
+export function createPullRequestItem(branch: string): MenuEntry[] {
+  const host = pullRequestHost();
+  return host ? [{ label: tReview("pr.menu.create", host.integration.kind), action: () => openPullRequest(branch) }] : [];
 }
 
 /** A branch name set apart inside a menu label. */
@@ -466,7 +472,7 @@ export function localBranchMenu(b: LocalBranch): MenuEntry[] {
       label: `Push to ${rm.name}/${b.name}`,
       action: () => S().run("Push", (rp) => api.pushBranch(rp, rm.name, b.name), { success: () => ({ title: t("push.title"), description: `${b.name} → ${rm.name}/${b.name}` }) }),
     })),
-    ...(pullRequestHost() ? [{ label: "Create pull request…", action: () => openPullRequest(b.name) }] : []),
+    ...createPullRequestItem(b.name),
     "sep",
     { label: "Create branch here", action: () => newBranch(b.oid) },
     { label: "Rename…", action: () => renameBranch(b.name) },

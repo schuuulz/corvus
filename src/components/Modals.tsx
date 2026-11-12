@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import * as A from "../actions";
+import { tReview } from "../reviews";
 import { THEMES } from "../settings";
 import { useRepo, useStore } from "../store";
 
@@ -135,7 +136,8 @@ export function CommandPalette() {
         { label: "Refresh", hint: "F5", run: () => useStore.getState().refresh() },
       );
       const head = data?.info?.headBranch;
-      if (head && A.pullRequestHost()) c.push({ label: "Create pull request…", run: () => A.openPullRequest(head) });
+      const host = A.pullRequestHost();
+      if (head && host) c.push({ label: tReview("pr.menu.create", host.integration.kind), run: () => A.openPullRequest(head) });
       for (const b of data?.refs?.locals ?? []) if (!b.isHead) c.push({ label: `Checkout ${b.name}`, run: () => A.checkout(b.name) });
       for (const b of data?.refs?.locals ?? []) if (!b.isHead) c.push({ label: `Merge ${b.name} into current`, run: () => A.merge(b.name) });
     }

@@ -208,7 +208,7 @@ export function Toolbar() {
                     await A.push(true);
                 },
               },
-              ...(head && A.pullRequestHost() ? [{ label: "Create pull request…", action: () => A.openPullRequest(head) }] : []),
+              ...(head ? A.createPullRequestItem(head) : []),
             ])
           }
         >
@@ -316,7 +316,7 @@ function RestartToUpdate() {
   const update = useStore((s) => s.update);
   if (update?.phase !== "postponed") return null;
   return (
-    <button className="small primary statusbar-update" title={t("update.available", { version: update.version })} onClick={installUpdate}>
+    <button className="small primary statusbar-update" title={t("update.available", { version: update.release.version })} onClick={installUpdate}>
       <RefreshCw size={11} /> {t("update.restart")}
     </button>
   );

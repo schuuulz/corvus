@@ -29,12 +29,63 @@ impl Kind {
     }
 }
 
-pub fn default_host(kind: Kind, host: &str) -> String {
+fn default_host(kind: Kind, host: &str) -> String {
     match kind {
         Kind::Github => "github.com".into(),
         Kind::Gitlab => "gitlab.com".into(),
         _ => host.trim().trim_start_matches("https://").trim_start_matches("http://").trim_end_matches('/').to_string(),
     }
+}
+
+/// Whether `host` is a bare `name[:port]`, the only shape a server address
+/// may take. Anything else (`user@host`, a path, `=`) could send the token
+/// somewhere other than where it seems to go, or reach into the git config
+/// the token is served through (`cli::network_command`). IPv6 literals are
+/// not accepted.
+fn is_bare_host(host: &str) -> bool {
+    let (name, port) = match host.split_once(':') {
+        Some((name, port)) => (name, Some(port)),
+        None => (host, None),
+    };
+    let label_ok = |label: &str| {
+        !label.is_empty()
+            && label.len() <= 63
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+            && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+    };
+    let name_ok = name.len() <= 253 && name.split('.').all(label_ok);
+    let port_ok = port.is_none_or(|p| p.chars().all(|c| c.is_ascii_digit()) && p.parse::<u16>().is_ok_and(|n| n != 0));
+    name_ok && port_ok
+}
+
+/// The server address for `kind`, refused unless it is a bare host.
+pub fn checked_host(kind: Kind, host: &str) -> Result<String> {
+    let host = default_host(kind, host);
+    if is_bare_host(&host) {
+        Ok(host)
+    } else {
+        msg(format!("\"{host}\" is not a server address: enter a host name such as gitlab.example.com"))
+    }
+}
+
+/// The repository path as the API addresses it: `owner/repo` on GitHub,
+/// `group/subgroup/project` (URL-encoded) on GitLab. It comes from a remote
+/// URL, which a cloned repository chooses, so only plain names get through:
+/// nothing that could steer the request to another endpoint.
+fn api_repo(kind: Kind, path: &str) -> Result<String> {
+    let segments: Vec<&str> = path.split('/').collect();
+    let plain = |segment: &&str| {
+        !segment.is_empty()
+            && *segment != "."
+            && *segment != ".."
+            && segment.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    };
+    let shape_ok = if kind.is_github() { segments.len() == 2 } else { segments.len() >= 2 };
+    if !shape_ok || !segments.iter().all(plain) {
+        return msg(format!("\"{path}\" is not a repository path this integration can address"));
+    }
+    Ok(if kind.is_github() { path.to_string() } else { segments.join("%2F") })
 }
 
 fn api_base(kind: Kind, host: &str) -> String {
@@ -77,9 +128,20 @@ fn follows_same_origin(previous: &[reqwest::Url], next: &reqwest::Url) -> bool {
 
 struct Client {
     kind: Kind,
+    /// The server, already checked to be a bare host.
+    host: String,
     base: String,
     token: String,
     http: reqwest::Client,
+}
+
+/// `host[:port]` of `url`, the port only when it isn't the scheme's default.
+fn authority(url: &reqwest::Url) -> String {
+    let host = url.host_str().unwrap_or_default();
+    match url.port() {
+        Some(port) => format!("{host}:{port}"),
+        None => host.to_string(),
+    }
 }
 
 fn err(e: reqwest::Error) -> Error {
@@ -88,9 +150,10 @@ fn err(e: reqwest::Error) -> Error {
 
 impl Client {
     fn new(kind: Kind, host: &str, token: Option<String>) -> Result<Self> {
+        let host = checked_host(kind, host)?;
         let token = match token {
             Some(t) => t,
-            None => system::secret_get(&secret_key(kind, host)).ok_or_else(|| Error::Msg("integration is not connected".into()))?,
+            None => system::secret_get(&secret_key(kind, &host)).ok_or_else(|| Error::Msg("integration is not connected".into()))?,
         };
         let http = reqwest::Client::builder()
             .user_agent("corvus")
@@ -98,7 +161,23 @@ impl Client {
             .redirect(same_origin_redirects())
             .build()
             .map_err(err)?;
-        Ok(Client { kind, base: api_base(kind, host), token, http })
+        Ok(Client { kind, base: api_base(kind, &host), host, token, http })
+    }
+
+    /// `url` when it is an https page on this integration's own site, else
+    /// empty. The UI opens these links in the browser, so a response can't
+    /// point one anywhere else.
+    fn own_link(&self, url: &str) -> String {
+        let site = if self.kind == Kind::Github { "github.com" } else { self.host.as_str() };
+        match reqwest::Url::parse(url) {
+            Ok(u) if u.scheme() == "https" && u.username().is_empty() && u.password().is_none() && authority(&u).eq_ignore_ascii_case(site) => u.to_string(),
+            _ => String::new(),
+        }
+    }
+
+    fn pull_request(&self, p: &Value) -> PullRequest {
+        let pr = if self.kind.is_github() { github_pr(p) } else { gitlab_pr(p) };
+        PullRequest { url: self.own_link(&pr.url), ..pr }
     }
 
     fn req(&self, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
@@ -115,8 +194,7 @@ impl Client {
         let status = res.status();
         let body: Value = res.json().await.unwrap_or(Value::Null);
         if !status.is_success() {
-            let m = body.get("message").or_else(|| body.get("error")).map(|m| m.to_string()).unwrap_or_default();
-            return msg(format!("{} {}: {}", status.as_u16(), status.canonical_reason().unwrap_or(""), m.trim_matches('"')));
+            return msg(format!("{} {}: {}", status.as_u16(), status.canonical_reason().unwrap_or(""), error_message(&body)));
         }
         Ok(body)
     }
@@ -130,12 +208,39 @@ impl Client {
     }
 }
 
-fn s(v: &Value, k: &str) -> String {
-    v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string()
+/// Longest provider explanation shown; the rest is cut.
+const MAX_ERROR_CHARS: usize = 400;
+
+/// The provider's explanation of a failed request, as one readable line.
+/// GitHub sends a message with optional `errors` details; GitLab a string,
+/// a list, or a map of field → messages; OAuth failures an `error` code.
+fn error_message(body: &Value) -> String {
+    let headline = ["message", "error_description", "error"].iter().find_map(|k| body.get(*k)).map(flatten).unwrap_or_default();
+    let details: Vec<String> = body["errors"]
+        .as_array()
+        .map(|errors| errors.iter().filter_map(|e| e.get("message")).map(flatten).filter(|m| !m.is_empty()).collect())
+        .unwrap_or_default();
+    let text = if details.is_empty() { headline } else { format!("{headline}: {}", details.join("; ")) };
+    if text.chars().count() > MAX_ERROR_CHARS {
+        format!("{}…", text.chars().take(MAX_ERROR_CHARS).collect::<String>())
+    } else {
+        text
+    }
 }
 
-fn project(path: &str) -> String {
-    path.replace('/', "%2F")
+/// Joins GitLab's nested messages: `{"title": ["can't be blank"]}` → "title can't be blank".
+fn flatten(value: &Value) -> String {
+    match value {
+        Value::String(text) => text.clone(),
+        Value::Array(items) => items.iter().map(flatten).filter(|m| !m.is_empty()).collect::<Vec<_>>().join("; "),
+        Value::Object(fields) => fields.iter().map(|(field, m)| format!("{field} {}", flatten(m))).collect::<Vec<_>>().join("; "),
+        Value::Null => String::new(),
+        other => other.to_string(),
+    }
+}
+
+fn s(v: &Value, k: &str) -> String {
+    v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string()
 }
 
 #[derive(Serialize)]
@@ -148,15 +253,14 @@ pub struct Account {
 
 /// Validates the token, stores it in the keychain and returns the account.
 pub async fn connect(kind: Kind, host: &str, token: &str) -> Result<Account> {
-    let host = default_host(kind, host);
-    let c = Client::new(kind, &host, Some(token.trim().to_string()))?;
+    let c = Client::new(kind, host, Some(token.trim().to_string()))?;
     let u = c.get("/user").await?;
     let account = Account {
         username: if kind.is_github() { s(&u, "login") } else { s(&u, "username") },
         name: s(&u, "name"),
         avatar: s(&u, "avatar_url"),
     };
-    system::secret_set(&secret_key(kind, &host), token.trim())?;
+    system::secret_set(&secret_key(kind, &c.host), token.trim())?;
     Ok(account)
 }
 
@@ -203,18 +307,15 @@ fn gitlab_pr(p: &Value) -> PullRequest {
     }
 }
 
-fn to_pr(kind: Kind) -> fn(&Value) -> PullRequest {
-    if kind.is_github() { github_pr } else { gitlab_pr }
-}
-
 pub async fn pull_requests(kind: Kind, host: &str, repo: &str) -> Result<Vec<PullRequest>> {
-    let c = Client::new(kind, &default_host(kind, host), None)?;
+    let c = Client::new(kind, host, None)?;
+    let repo = api_repo(kind, repo)?;
     let list = if kind.is_github() {
         c.get(&format!("/repos/{repo}/pulls?state=open&per_page=50")).await?
     } else {
-        c.get(&format!("/projects/{}/merge_requests?state=opened&per_page=50", project(repo))).await?
+        c.get(&format!("/projects/{repo}/merge_requests?state=opened&per_page=50")).await?
     };
-    Ok(list.as_array().map(|a| a.iter().map(to_pr(kind)).collect()).unwrap_or_default())
+    Ok(list.as_array().map(|a| a.iter().map(|p| c.pull_request(p)).collect()).unwrap_or_default())
 }
 
 /// What the connected account may do on a hosted repository.
@@ -246,11 +347,12 @@ fn gitlab_access(project: &Value) -> RepoAccess {
 }
 
 pub async fn repo_access(kind: Kind, host: &str, repo: &str) -> Result<RepoAccess> {
-    let c = Client::new(kind, &default_host(kind, host), None)?;
+    let c = Client::new(kind, host, None)?;
+    let repo = api_repo(kind, repo)?;
     if kind.is_github() {
         Ok(github_access(&c.get(&format!("/repos/{repo}")).await?))
     } else {
-        Ok(gitlab_access(&c.get(&format!("/projects/{}", project(repo))).await?))
+        Ok(gitlab_access(&c.get(&format!("/projects/{repo}")).await?))
     }
 }
 
@@ -265,11 +367,12 @@ pub struct Issue {
 }
 
 pub async fn issues(kind: Kind, host: &str, repo: &str) -> Result<Vec<Issue>> {
-    let c = Client::new(kind, &default_host(kind, host), None)?;
+    let c = Client::new(kind, host, None)?;
+    let repo = api_repo(kind, repo)?;
     let list = if kind.is_github() {
         c.get(&format!("/repos/{repo}/issues?state=open&per_page=50")).await?
     } else {
-        c.get(&format!("/projects/{}/issues?state=opened&per_page=50", project(repo))).await?
+        c.get(&format!("/projects/{repo}/issues?state=opened&per_page=50")).await?
     };
     Ok(list
         .as_array()
@@ -280,7 +383,7 @@ pub async fn issues(kind: Kind, host: &str, repo: &str) -> Result<Vec<Issue>> {
                 .map(|i| Issue {
                     number: i[if kind.is_github() { "number" } else { "iid" }].as_u64().unwrap_or(0),
                     title: s(i, "title"),
-                    url: s(i, if kind.is_github() { "html_url" } else { "web_url" }),
+                    url: c.own_link(&s(i, if kind.is_github() { "html_url" } else { "web_url" })),
                     author: if kind.is_github() { s(&i["user"], "login") } else { s(&i["author"], "username") },
                     labels: i["labels"]
                         .as_array()
@@ -308,7 +411,8 @@ fn gitlab_title(pr: &NewPullRequest) -> String {
 }
 
 pub async fn create_pull_request(kind: Kind, host: &str, repo: &str, pr: &NewPullRequest) -> Result<PullRequest> {
-    let c = Client::new(kind, &default_host(kind, host), None)?;
+    let c = Client::new(kind, host, None)?;
+    let repo = api_repo(kind, repo)?;
     let created = if kind.is_github() {
         c.post(
             &format!("/repos/{repo}/pulls"),
@@ -317,16 +421,16 @@ pub async fn create_pull_request(kind: Kind, host: &str, repo: &str, pr: &NewPul
         .await?
     } else {
         c.post(
-            &format!("/projects/{}/merge_requests", project(repo)),
+            &format!("/projects/{repo}/merge_requests"),
             json!({ "title": gitlab_title(pr), "source_branch": pr.source, "target_branch": pr.target, "description": pr.body }),
         )
         .await?
     };
-    Ok(to_pr(kind)(&created))
+    Ok(c.pull_request(&created))
 }
 
 pub async fn add_ssh_key(kind: Kind, host: &str, title: &str, public_key: &str) -> Result<()> {
-    let c = Client::new(kind, &default_host(kind, host), None)?;
+    let c = Client::new(kind, host, None)?;
     c.post("/user/keys", json!({ "title": title, "key": public_key.trim() })).await.map(|_| ())
 }
 
@@ -339,19 +443,29 @@ pub struct RemoteRef {
 }
 
 /// Parses https, scp-style and ssh:// remote URLs.
+///
+/// The host is read the way git reads it: from the authority alone (up to
+/// the first `/`, or the first `:` in scp form), then without its user
+/// info. Looking for `@` anywhere else would let a remote such as
+/// `https://evil.com/x@gitlab.corp/g/p` pass for a connected server while
+/// git pushes to another one.
 pub fn parse_remote(url: &str) -> Option<RemoteRef> {
     let url = url.trim();
-    let (host, path) = if let Some(rest) = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://")) {
-        let rest = rest.rsplit_once('@').map(|(_, r)| r).unwrap_or(rest);
+    let (authority, path) = if let Some(rest) = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://")) {
         rest.split_once('/')?
     } else if let Some(rest) = url.strip_prefix("ssh://") {
-        let rest = rest.split_once('@').map(|(_, r)| r).unwrap_or(rest);
-        let (h, p) = rest.split_once('/')?;
-        (h.split(':').next()?, p)
+        rest.split_once('/')?
     } else {
-        let rest = url.split_once('@').map(|(_, r)| r).unwrap_or(url);
-        rest.split_once(':')?
+        // scp form: `[user@]host:path`, unless a `/` comes first (a local path).
+        let (authority, path) = url.split_once(':')?;
+        if authority.contains('/') {
+            return None;
+        }
+        (authority, path)
     };
+    let host = authority.rsplit_once('@').map_or(authority, |(_, host)| host);
+    // ssh:// may name a port, which the integration's host doesn't carry.
+    let host = if url.starts_with("ssh://") { host.split(':').next()? } else { host };
     let path = path.trim_end_matches('/').trim_end_matches(".git").to_string();
     (!host.is_empty() && path.contains('/')).then(|| RemoteRef { host: host.to_lowercase(), path })
 }
@@ -382,6 +496,11 @@ mod tests {
             Some(RemoteRef { host: "gitlab.example.com".into(), path: "group/sub/proj".into() })
         );
         assert_eq!(parse_remote("/local/path"), None);
+        assert_eq!(parse_remote("./dir:with/colon"), None, "a local path with a colon");
+        // An `@` outside the authority belongs to the path: git reaches evil.com.
+        for url in ["https://evil.com/x@gitlab.corp/g/p", "ssh://evil.com/x@github.com/o/r", "evil.com:x@github.com:o/r.git"] {
+            assert_eq!(parse_remote(url).map(|r| r.host), Some("evil.com".into()), "{url}");
+        }
     }
 
     #[test]
@@ -420,6 +539,74 @@ mod tests {
         }
         assert!(github.url.ends_with("/pull/7"));
         assert!(gitlab.url.ends_with("/merge_requests/7"));
+    }
+
+    #[test]
+    fn reads_provider_error_messages() {
+        assert_eq!(error_message(&json!({ "message": "404 Project Not Found" })), "404 Project Not Found");
+        assert_eq!(
+            error_message(&json!({ "message": ["Another open merge request already exists for this source branch: !12"] })),
+            "Another open merge request already exists for this source branch: !12"
+        );
+        assert_eq!(
+            error_message(&json!({ "message": { "title": ["can't be blank"], "target_branch": ["is invalid", "is missing"] } })),
+            "target_branch is invalid; is missing; title can't be blank"
+        );
+        assert_eq!(
+            error_message(&json!({ "message": "Validation Failed", "errors": [{ "message": "A pull request already exists for o:feat." }] })),
+            "Validation Failed: A pull request already exists for o:feat."
+        );
+        assert_eq!(error_message(&json!({ "error": "insufficient_scope" })), "insufficient_scope");
+        assert_eq!(error_message(&Value::Null), "");
+        assert_eq!(error_message(&json!({ "message": "x".repeat(1000) })).chars().count(), MAX_ERROR_CHARS + 1);
+    }
+
+    #[test]
+    fn accepts_only_bare_server_addresses() {
+        for ok in ["gitlab.example.com", "gitlab.example.com:8443", "localhost", "10.0.0.5:8080", "git-lab.corp"] {
+            assert!(is_bare_host(ok), "{ok}");
+        }
+        let bad = [
+            "", "gitlab.corp@evil.com", "gitlab.corp/path", "gitlab.corp?x", "gitlab.corp#x", "x.helper=!calc", "gitlab corp", "gitlab.corp\\x",
+            "gitlab.corp:", "gitlab.corp:0", "gitlab.corp:99999", "gitlab.corp:80:80", "gitlab.corp:+80", "-gitlab.corp", "gitlab..corp", "[::1]:8443",
+        ];
+        for host in bad {
+            assert!(!is_bare_host(host), "{host}");
+        }
+        assert_eq!(checked_host(Kind::GitlabSelf, "https://gitlab.corp:8443/").unwrap(), "gitlab.corp:8443");
+        assert_eq!(checked_host(Kind::Github, "anything@evil.com").unwrap(), "github.com", "github.com's host is fixed");
+        assert!(checked_host(Kind::GitlabSelf, "https://gitlab.corp@evil.com").is_err());
+        assert!(checked_host(Kind::GithubEnterprise, "github.corp/x").is_err());
+    }
+
+    #[test]
+    fn addresses_only_plain_repository_paths() {
+        assert_eq!(api_repo(Kind::Github, "owner/repo.js").unwrap(), "owner/repo.js");
+        assert_eq!(api_repo(Kind::GitlabSelf, "group/sub/proj").unwrap(), "group%2Fsub%2Fproj");
+        for path in ["owner", "owner/repo/extra", "owner/..", "owner/repo?x=1", "owner/repo#x", "owner/re%2Fpo", "owner//repo", "../user"] {
+            assert!(api_repo(Kind::Github, path).is_err(), "{path}");
+        }
+        for path in ["group", "group/../admin", "group/./proj", "group/proj?private_token=x", "group/pr oj"] {
+            assert!(api_repo(Kind::Gitlab, path).is_err(), "{path}");
+        }
+    }
+
+    #[test]
+    fn keeps_only_links_to_the_integrations_own_site() {
+        let client = |kind, host| Client::new(kind, host, Some("token".into())).unwrap();
+        let gitlab = client(Kind::GitlabSelf, "gitlab.corp:8443");
+        let mr = "https://gitlab.corp:8443/g/p/-/merge_requests/7";
+        assert_eq!(gitlab.own_link(mr), mr);
+        let foreign = [
+            "https://evil.example/g/p", "http://gitlab.corp:8443/g/p", "https://gitlab.corp/g/p", "https://user@gitlab.corp:8443/g/p",
+            "javascript:alert(1)", "file:///etc/passwd", "",
+        ];
+        for url in foreign {
+            assert_eq!(gitlab.own_link(url), "", "{url}");
+        }
+        let github = client(Kind::Github, "");
+        assert_eq!(github.own_link("https://github.com/o/r/pull/7"), "https://github.com/o/r/pull/7");
+        assert_eq!(github.own_link("https://api.github.com/repos/o/r/pulls/7"), "");
     }
 
     #[test]
