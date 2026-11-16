@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.8.0](https://github.com/schuuulz/corvus/compare/corvus-v0.7.0...corvus-v0.8.0) (2026-11-12)
+
+
+### Features
+
+* **pr:** create merge requests in the app and redesign the update dialog ([d1dce74](https://github.com/schuuulz/corvus/commit/d1dce741f1fea6c5c3997edb858d66a7346ae53b))
+* **pr:** create merge requests without leaving the app ([6cf96d2](https://github.com/schuuulz/corvus/commit/6cf96d224a91699f18de26bb1ffd0656de1a7cd0))
+* **updater:** redesign the update dialog around the corvus mark ([67ca6e0](https://github.com/schuuulz/corvus/commit/67ca6e02f1cd5e5c5b14a3ad48e86f55beccc889))
+
+
+### Bug Fixes
+
+* **conflicts:** preview predicted conflicts and resolve them block by block ([7685bb6](https://github.com/schuuulz/corvus/commit/7685bb6364a8fa152bdffcbe8e679080b95cf3f6))
+* **conflicts:** preview predicted conflicts and resolve them block by block ([b19d35f](https://github.com/schuuulz/corvus/commit/b19d35f6fa4763065263ef795b4bdf30e0e27534))
+* **integrations:** read a remote's host from its authority only ([ce85ea2](https://github.com/schuuulz/corvus/commit/ce85ea2d2491965124990fdec729dd6cf6fa38fd))
+* **integrations:** validate hosts, repo paths and links from the api ([5c1939d](https://github.com/schuuulz/corvus/commit/5c1939dbcfa3154ca57f84f90ebf1b9ad7b8390b))
+
 ## [0.7.0](https://github.com/schuuulz/corvus/compare/corvus-v0.6.0...corvus-v0.7.0) (2026-10-30)
 
 
