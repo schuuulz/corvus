@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.9.0](https://github.com/schuuulz/corvus/compare/corvus-v0.8.0...corvus-v0.9.0) (2026-11-16)
+
+
+### Features
+
+* **clone:** pick repositories from integrations and remember the parent folder ([8d10a17](https://github.com/schuuulz/corvus/commit/8d10a1732734e32712cf1bcc3f7148ecffd835cf))
+* **clone:** pick repositories from integrations and remember the parent folder ([f6466d4](https://github.com/schuuulz/corvus/commit/f6466d4d483952569e99b7c3e70d40195ad4047d))
+* **merge:** keep the ours and theirs panes on the current conflict ([3a51365](https://github.com/schuuulz/corvus/commit/3a51365cfc6479c4a1e1824f6d8d8cbdff786465))
+* **merge:** keep the ours and theirs panes on the current conflict ([226fcf6](https://github.com/schuuulz/corvus/commit/226fcf6455252e9ea9376d3f7a3c659d5d8ff7fa))
+
 ## [0.8.0](https://github.com/schuuulz/corvus/compare/corvus-v0.7.0...corvus-v0.8.0) (2026-11-12)
 
 
