@@ -164,6 +164,83 @@ function useConflictNavigator(blocks: Block[]) {
   return { editor, current, goTo, step, onMount, onKeyDownCapture, revealAfterEdit };
 }
 
+/** A run of lines in one side's file, 0-based like `Block`; empty when that side has none there. */
+interface LineSpan {
+  start: number;
+  length: number;
+}
+
+/** Where a conflict block sits in the ours and theirs files. */
+interface SideSpans {
+  ours: LineSpan;
+  theirs: LineSpan;
+}
+
+/**
+ * Where each block of git's merged text sits in the two sides' files. Every
+ * line outside a block is shared, so a block lies as many lines earlier in a
+ * side as the earlier blocks add beyond that side's own lines (markers, the
+ * other side, and any diff3 base).
+ */
+function sideSpans(blocks: Block[]): SideSpans[] {
+  let oursShift = 0;
+  let theirsShift = 0;
+  return blocks.map((b) => {
+    const spans = {
+      ours: { start: b.start - oursShift, length: b.ours.length },
+      theirs: { start: b.start - theirsShift, length: b.theirs.length },
+    };
+    const blockLength = b.end - b.start + 1;
+    oursShift += blockLength - b.ours.length;
+    theirsShift += blockLength - b.theirs.length;
+    return spans;
+  });
+}
+
+const sameLines = (a: string[], b: string[]) => a.length === b.length && a.every((line, i) => line === b[i]);
+
+/**
+ * For each block still in the output, the index of the block it was in git's
+ * merged text. Resolving removes blocks but keeps the rest in order, so they
+ * are matched in order by content; a block whose sides were edited by hand
+ * matches nothing.
+ */
+function matchOriginal(current: Block[], original: Block[]): (number | null)[] {
+  let next = 0;
+  return current.map((b) => {
+    const found = original.findIndex((o, i) => i >= next && sameLines(o.ours, b.ours) && sameLines(o.theirs, b.theirs));
+    if (found < 0) return null;
+    next = found + 1;
+    return found;
+  });
+}
+
+/** Where the current block of the output sits in each side's file, if it can be told. */
+function useSideSpans(merged: string, blocks: Block[], current: number): SideSpans | null {
+  const original = useMemo(() => conflictBlocks(merged), [merged]);
+  const spans = useMemo(() => sideSpans(original), [original]);
+  const matches = useMemo(() => matchOriginal(blocks, original), [blocks, original]);
+  const match = matches[current];
+  return match == null ? null : spans[match];
+}
+
+/** A read-only side pane that keeps `span` in view and tinted with `className`. */
+function useFollowingPane(span: LineSpan | null, className: "cf-ours" | "cf-theirs"): OnMount {
+  const [editor, setEditor] = useState<CodeEditor | null>(null);
+  const start = span?.start;
+  const length = span?.length;
+
+  useEffect(() => {
+    if (!editor || start === undefined || length === undefined) return;
+    editor.revealLineInCenter(start + 1);
+    const range = lineRange(start, start + length - 1);
+    const collection = editor.createDecorationsCollection(range ? [{ range, options: { isWholeLine: true, className } }] : []);
+    return () => collection.clear();
+  }, [editor, start, length, className]);
+
+  return (e) => setEditor(e);
+}
+
 function BlockNav({ count, current, step }: { count: number; current: number; step: (delta: number) => void }) {
   if (!count) return <span className="muted">No conflict blocks</span>;
   return (
@@ -247,6 +324,10 @@ export default function MergeEditor({ file }: { file: string }) {
 
   const blocks = useMemo(() => conflictBlocks(output), [output]);
   const nav = useConflictNavigator(blocks);
+  const gitMerged = useMemo(() => normalizeEol(v?.merged ?? ""), [v]);
+  const spans = useSideSpans(gitMerged, blocks, nav.current);
+  const oursPane = useFollowingPane(spans?.ours ?? null, "cf-ours");
+  const theirsPane = useFollowingPane(spans?.theirs ?? null, "cf-theirs");
   const lang = languageOf(file);
   const edTheme = useEditorTheme();
   const opts = useEditorOptions();
@@ -286,11 +367,11 @@ export default function MergeEditor({ file }: { file: string }) {
       <div className="merge-top">
         <div className="pane">
           <div className="pane-title ours">Ours (current branch)</div>
-          <Editor value={v.ours} language={lang} theme={edTheme} options={ro} />
+          <Editor value={v.ours} onMount={oursPane} language={lang} theme={edTheme} options={ro} />
         </div>
         <div className="pane">
           <div className="pane-title theirs">Theirs (incoming)</div>
-          <Editor value={v.theirs} language={lang} theme={edTheme} options={ro} />
+          <Editor value={v.theirs} onMount={theirsPane} language={lang} theme={edTheme} options={ro} />
         </div>
       </div>
       <BlockChoices blocks={blocks} current={nav.current} goTo={nav.goTo} choose={choose} />
@@ -316,6 +397,9 @@ export function ConflictPreview({ file, base }: { file: string; base: string }) 
   const merged = useMemo(() => normalizeEol(v?.merged ?? ""), [v]);
   const blocks = useMemo(() => conflictBlocks(merged), [merged]);
   const nav = useConflictNavigator(blocks);
+  const spans = useSideSpans(merged, blocks, nav.current);
+  const oursPane = useFollowingPane(spans?.ours ?? null, "cf-ours");
+  const theirsPane = useFollowingPane(spans?.theirs ?? null, "cf-theirs");
   const lang = languageOf(file);
   const edTheme = useEditorTheme();
   const ro = { ...useEditorOptions(), readOnly: true };
@@ -335,11 +419,11 @@ export function ConflictPreview({ file, base }: { file: string; base: string }) 
       <div className="merge-top">
         <div className="pane">
           <div className="pane-title ours">Ours (current branch)</div>
-          <Editor value={v.ours} language={lang} theme={edTheme} options={ro} />
+          <Editor value={v.ours} onMount={oursPane} language={lang} theme={edTheme} options={ro} />
         </div>
         <div className="pane">
           <div className="pane-title theirs">Theirs ({base})</div>
-          <Editor value={v.theirs} language={lang} theme={edTheme} options={ro} />
+          <Editor value={v.theirs} onMount={theirsPane} language={lang} theme={edTheme} options={ro} />
         </div>
       </div>
       <div className="pane output">
