@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ext, Integration, IntegrationKind, Issue, PullRequest, Remote } from "./api";
+import { ext, Integration, IntegrationKind, Issue, PullRequest, Remote, RemoteRepo } from "./api";
 import { formatDate, fromNow } from "./format";
 import { g, RepoIntegration, useG, useRepo, useStore } from "./store";
 
@@ -75,34 +75,54 @@ export const useRepoIntegration = () => useStore((s) => (s.active ? s.repoIntegr
 
 interface RemoteList<T> { items: T[] | null; error: string | null; reload: () => void }
 
-/** `version` reloads the list when it changes (e.g. after creating an item). */
-function useRemoteList<T>(ri: RepoIntegration | null, load: (ri: RepoIntegration) => Promise<T[]>, version = 0): RemoteList<T> {
+/**
+ * A list loaded from `source`, and again whenever `key` changes (it names
+ * the source, plus anything that should trigger a reload). With no source
+ * there is nothing to list.
+ */
+function useRemoteList<S, T>(source: S | null, key: string, load: (source: S) => Promise<T[]>): RemoteList<T> {
   const [items, setItems] = useState<T[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
-  const key = ri ? `${ri.integration.id}|${ri.remote.path}|${tick}|${version}` : "";
   useEffect(() => {
-    if (!ri) {
+    if (!source) {
       setItems(null);
       return;
     }
     let live = true;
     setError(null);
-    load(ri).then((x) => live && setItems(x), (e) => live && setError(String(e)));
+    load(source).then((x) => live && setItems(x), (e) => live && setError(String(e)));
     return () => {
       live = false;
     };
-  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [source ? key : null, tick]); // eslint-disable-line react-hooks/exhaustive-deps
   return { items, error, reload: () => setTick((t) => t + 1) };
 }
 
+const hostedRepoKey = (ri: RepoIntegration | null) => (ri ? `${ri.integration.id}|${ri.remote.path}` : "");
+
+/** Reloads when a pull request is created (`pullRequestsVersion`). */
 export function usePullRequests(ri: RepoIntegration | null) {
   const version = useStore((s) => s.pullRequestsVersion);
-  return useRemoteList<PullRequest>(ri, ({ integration: i, remote }) => ext.pulls(i.kind, i.host, remote.path), version);
+  return useRemoteList<RepoIntegration, PullRequest>(ri, `${hostedRepoKey(ri)}|${version}`, ({ integration: i, remote }) => ext.pulls(i.kind, i.host, remote.path));
 }
 
 export const useIssues = (ri: RepoIntegration | null) =>
-  useRemoteList<Issue>(ri, ({ integration: i, remote }) => ext.issues(i.kind, i.host, remote.path));
+  useRemoteList<RepoIntegration, Issue>(ri, hostedRepoKey(ri), ({ integration: i, remote }) => ext.issues(i.kind, i.host, remote.path));
+
+/** A repository to clone, with the server it lives on. */
+export interface HostedRepo extends RemoteRepo { host: string }
+
+async function listRepos(accounts: Integration[]): Promise<HostedRepo[]> {
+  const perAccount = await Promise.all(
+    accounts.map(async (i) => (await ext.repositories(i.kind, i.host)).map((repo) => ({ ...repo, host: i.host }))),
+  );
+  return perAccount.flat();
+}
+
+/** The repositories the connected `accounts` can clone. */
+export const useCloneableRepos = (accounts: Integration[]) =>
+  useRemoteList<Integration[], HostedRepo>(accounts.length ? accounts : null, accounts.map((i) => i.id).join(","), listRepos);
 
 /** True when the viewport is narrower than `px`. */
 export function useNarrow(px: number) {
