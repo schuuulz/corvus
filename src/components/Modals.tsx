@@ -1,54 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import * as A from "../actions";
 import { tReview } from "../reviews";
 import { THEMES } from "../settings";
 import { useRepo, useStore } from "../store";
-
-export function CloneDialog() {
-  const { set } = useStore.getState();
-  const busy = useStore((s) => s.busy);
-  const progress = useStore((s) => s.progress);
-  const [url, setUrl] = useState("");
-  const [dir, setDir] = useState("");
-  const name = url.replace(/\/+$/, "").split(/[/:]/).pop()?.replace(/\.git$/, "") ?? "";
-  const dest = dir && name ? `${dir.replace(/[\\/]+$/, "")}/${name}` : "";
-  const pick = async () => {
-    const d = await open({ directory: true, title: "Clone into…" });
-    if (typeof d === "string") setDir(d);
-  };
-  return (
-    <div className="modal-back" onClick={() => !busy && set({ modal: null })}>
-      <form
-        className="modal"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (await A.cloneRepo(url.trim(), dest)) set({ modal: null });
-        }}
-      >
-        <h3>Clone a repository</h3>
-        <label className="field">
-          <span>URL</span>
-          <input autoFocus value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://github.com/owner/repo.git" />
-        </label>
-        <label className="field">
-          <span>Parent folder</span>
-          <div className="row-inline">
-            <input value={dir} onChange={(e) => setDir(e.target.value)} placeholder="C:/Users/me/code" />
-            <button type="button" onClick={pick}>Browse…</button>
-          </div>
-        </label>
-        {dest && <div className="muted small">Will clone into {dest}</div>}
-        {busy && <div className="muted small"><span className="spinner" /> {progress}</div>}
-        <div className="modal-actions">
-          <button type="button" disabled={!!busy} onClick={() => set({ modal: null })}>Cancel</button>
-          <button type="submit" className="primary" disabled={!url.trim() || !dest || !!busy}>Clone</button>
-        </div>
-      </form>
-    </div>
-  );
-}
 
 export const SHORTCUTS: [string, string][] = [
   ["Command palette", "Ctrl+P"],

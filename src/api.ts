@@ -141,6 +141,8 @@ export interface NewPullRequest { source: string; target: string; title: string;
 /** What the connected account may do on the hosted repository. */
 export interface RepoAccess { canPush: boolean; defaultBranch: string }
 export interface Issue { number: number; title: string; url: string; author: string; labels: string[] }
+/** A repository the connected account can clone; `cloneUrl` is HTTPS. */
+export interface RemoteRepo { fullName: string; description: string; cloneUrl: string; private: boolean }
 export interface RemoteRef { host: string; path: string }
 export interface LogEntry { id: number; time: number; cwd: string; args: string; ok: boolean; ms: number; output: string }
 export interface SshKeyPair { privateKey: string; publicKey: string }
@@ -196,6 +198,7 @@ export const ext = {
   disconnect: (kind: IntegrationKind, host: string) => call<void>("integration_disconnect", { kind, host }),
   pulls: (kind: IntegrationKind, host: string, repo: string) => call<PullRequest[]>("integration_pulls", { kind, host, repo }),
   issues: (kind: IntegrationKind, host: string, repo: string) => call<Issue[]>("integration_issues", { kind, host, repo }),
+  repositories: (kind: IntegrationKind, host: string) => call<RemoteRepo[]>("integration_repositories", { kind, host }),
   repoAccess: (kind: IntegrationKind, host: string, repo: string) => call<RepoAccess>("integration_repo_access", { kind, host, repo }),
   createPr: (kind: IntegrationKind, host: string, repo: string, pr: NewPullRequest) => call<PullRequest>("integration_create_pr", { kind, host, repo, pr }),
   addSshKey: (kind: IntegrationKind, host: string, title: string, publicKeyPath: string) => call<void>("integration_add_ssh_key", { kind, host, title, publicKeyPath }),

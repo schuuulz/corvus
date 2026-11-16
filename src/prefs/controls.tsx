@@ -6,6 +6,7 @@ import { create } from "zustand";
 import { open } from "@tauri-apps/plugin-dialog";
 import { AlertTriangle } from "lucide-react";
 import { ext } from "../api";
+import { normalizePath } from "../paths";
 import { GlobalKey, GlobalSettings, RepoKey, RepoSettings } from "../settings";
 import { useG, useR, useStore } from "../store";
 
@@ -130,7 +131,7 @@ export function PathInput(p: { k: GlobalKey; label: string; help?: ReactNode; di
   const [v, set] = useValue(p.k, "global");
   const browse = async () => {
     const f = await open({ directory: p.directory, multiple: false, title: p.label });
-    if (typeof f === "string") set(f.replace(/\\/g, "/"));
+    if (typeof f === "string") set(normalizePath(f));
   };
   return (
     <Setting label={p.label} help={p.help}>
@@ -184,7 +185,7 @@ export function GitText({ gitKey, repo = null, label, help, placeholder, browse 
   useEffect(() => setDraft(v ?? ""), [v]);
   const pick = async () => {
     const f = await open({ directory: browse === "dir", title: label });
-    if (typeof f === "string") void set(f.replace(/\\/g, "/"));
+    if (typeof f === "string") void set(normalizePath(f));
   };
   return (
     <Setting label={label} help={help} tag={`${repo ? "" : "--global "}${gitKey}`}>

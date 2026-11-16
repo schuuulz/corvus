@@ -269,6 +269,11 @@ pub async fn integration_issues(kind: Kind, host: String, repo: String) -> Resul
 }
 
 #[tauri::command]
+pub async fn integration_repositories(kind: Kind, host: String) -> Result<Vec<integ::RemoteRepo>> {
+    integ::repositories(kind, &host).await
+}
+
+#[tauri::command]
 pub async fn integration_repo_access(kind: Kind, host: String, repo: String) -> Result<integ::RepoAccess> {
     integ::repo_access(kind, &host, &repo).await
 }

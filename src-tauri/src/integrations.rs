@@ -180,6 +180,13 @@ impl Client {
         PullRequest { url: self.own_link(&pr.url), ..pr }
     }
 
+    /// The clone URL is handed to git with this integration's token, so it
+    /// is kept only when it points at the integration's own server.
+    fn repository(&self, r: &Value) -> RemoteRepo {
+        let repo = if self.kind.is_github() { github_repo(r) } else { gitlab_repo(r) };
+        RemoteRepo { clone_url: self.own_link(&repo.clone_url), ..repo }
+    }
+
     fn req(&self, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
         let r = self.http.request(method, format!("{}{}", self.base, path));
         if self.kind.is_github() {
@@ -206,7 +213,32 @@ impl Client {
     async fn post(&self, path: &str, body: Value) -> Result<Value> {
         self.send(self.req(reqwest::Method::POST, path).json(&body)).await
     }
+
+    /// Every item of the paged list at `path` (which already carries a
+    /// query), read page by page until a short one, up to `MAX_PAGES`.
+    async fn get_all(&self, path: &str) -> Result<Vec<Value>> {
+        let mut items = Vec::new();
+        for page in 1..=MAX_PAGES {
+            let batch = match self.get(&format!("{path}&per_page={PAGE_SIZE}&page={page}")).await? {
+                Value::Array(batch) => batch,
+                _ => Vec::new(),
+            };
+            let last = batch.len() < PAGE_SIZE;
+            items.extend(batch);
+            if last {
+                break;
+            }
+        }
+        Ok(items)
+    }
 }
+
+/// The largest page both providers serve.
+const PAGE_SIZE: usize = 100;
+
+/// Pages read from a full listing: an account with more items than this
+/// gets its most recently active ones.
+const MAX_PAGES: usize = 10;
 
 /// Longest provider explanation shown; the rest is cut.
 const MAX_ERROR_CHARS: usize = 400;
@@ -316,6 +348,49 @@ pub async fn pull_requests(kind: Kind, host: &str, repo: &str) -> Result<Vec<Pul
         c.get(&format!("/projects/{repo}/merge_requests?state=opened&per_page=50")).await?
     };
     Ok(list.as_array().map(|a| a.iter().map(|p| c.pull_request(p)).collect()).unwrap_or_default())
+}
+
+/// A repository the connected account can clone.
+#[derive(Serialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteRepo {
+    /// owner/repo (GitLab may include subgroups)
+    pub full_name: String,
+    pub description: String,
+    /// HTTPS, the transport the integration's token authenticates.
+    pub clone_url: String,
+    pub private: bool,
+}
+
+fn github_repo(r: &Value) -> RemoteRepo {
+    RemoteRepo {
+        full_name: s(r, "full_name"),
+        description: s(r, "description"),
+        clone_url: s(r, "clone_url"),
+        private: r["private"].as_bool().unwrap_or(false),
+    }
+}
+
+/// GitLab's "internal" projects are private to the server's signed-in users.
+fn gitlab_repo(r: &Value) -> RemoteRepo {
+    RemoteRepo {
+        full_name: s(r, "path_with_namespace"),
+        description: s(r, "description"),
+        clone_url: s(r, "http_url_to_repo"),
+        private: s(r, "visibility") != "public",
+    }
+}
+
+/// The repositories the account owns or is a member of, most recently
+/// active first. Ones without a usable clone URL are left out.
+pub async fn repositories(kind: Kind, host: &str) -> Result<Vec<RemoteRepo>> {
+    let c = Client::new(kind, host, None)?;
+    let list = if kind.is_github() {
+        c.get_all("/user/repos?sort=pushed").await?
+    } else {
+        c.get_all("/projects?membership=true&order_by=last_activity_at").await?
+    };
+    Ok(list.iter().map(|r| c.repository(r)).filter(|r| !r.clone_url.is_empty()).collect())
 }
 
 /// What the connected account may do on a hosted repository.
@@ -539,6 +614,44 @@ mod tests {
         }
         assert!(github.url.ends_with("/pull/7"));
         assert!(gitlab.url.ends_with("/merge_requests/7"));
+    }
+
+    #[test]
+    fn maps_repositories_from_both_providers() {
+        let github = github_repo(&json!({
+            "full_name": "ana/corvus", "description": "Git client", "private": true,
+            "clone_url": "https://github.com/ana/corvus.git", "ssh_url": "git@github.com:ana/corvus.git"
+        }));
+        let gitlab = gitlab_repo(&json!({
+            "path_with_namespace": "team/apps/corvus", "description": "Git client", "visibility": "private",
+            "http_url_to_repo": "https://gitlab.com/team/apps/corvus.git"
+        }));
+        let expected = |full_name: &str, clone_url: &str| RemoteRepo {
+            full_name: full_name.into(),
+            description: "Git client".into(),
+            clone_url: clone_url.into(),
+            private: true,
+        };
+        assert_eq!(github, expected("ana/corvus", "https://github.com/ana/corvus.git"));
+        assert_eq!(gitlab, expected("team/apps/corvus", "https://gitlab.com/team/apps/corvus.git"));
+        // GitHub sends a null description for repositories without one.
+        assert_eq!(github_repo(&json!({ "full_name": "ana/empty", "description": null })).description, "");
+    }
+
+    #[test]
+    fn reads_repository_visibility() {
+        assert!(!github_repo(&json!({ "private": false })).private);
+        assert!(!gitlab_repo(&json!({ "visibility": "public" })).private);
+        assert!(gitlab_repo(&json!({ "visibility": "internal" })).private);
+    }
+
+    #[test]
+    fn keeps_only_clone_urls_on_the_integrations_own_server() {
+        let gitlab = Client::new(Kind::GitlabSelf, "gitlab.corp", Some("token".into())).unwrap();
+        let clone_url = |url: &str| gitlab.repository(&json!({ "path_with_namespace": "g/p", "http_url_to_repo": url })).clone_url;
+        assert_eq!(clone_url("https://gitlab.corp/g/p.git"), "https://gitlab.corp/g/p.git");
+        assert_eq!(clone_url("https://evil.example/g/p.git"), "", "the token would follow the clone to another server");
+        assert_eq!(clone_url("http://gitlab.corp/g/p.git"), "", "the token would travel in the clear");
     }
 
     #[test]
