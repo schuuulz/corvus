@@ -18,6 +18,7 @@ export const GLOBAL_DEFAULTS = {
   initialCommits: 2000,
   lazyLoad: true,
   rememberTabs: true,
+  cloneParentFolder: "",
   gitPath: "",
   extendedLog: false,
   conflictDetection: true,

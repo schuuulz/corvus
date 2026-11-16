@@ -12,7 +12,7 @@ import { CommitPrefs, ConflictPrevention, Encoding, Gitflow, Hooks, IssueTracker
 interface Section { id: string; label: string; icon: ReactNode; repo?: boolean; page: () => ReactNode; keywords: string }
 
 const SECTIONS: Section[] = [
-  { id: "general", label: "General", icon: <Settings size={16} />, page: () => <General />, keywords: "identity name email auto-fetch fetch interval prune submodules conflict default branch orig remember tabs graph commits lazy load git path executable longpaths autocrlf activity log credentials forget" },
+  { id: "general", label: "General", icon: <Settings size={16} />, page: () => <General />, keywords: "identity name email auto-fetch fetch interval prune submodules conflict default branch clone parent folder orig remember tabs graph commits lazy load git path executable longpaths autocrlf activity log credentials forget" },
   { id: "ssh", label: "SSH", icon: <Shield size={16} />, page: () => <Ssh />, keywords: "ssh agent private public key generate credential manager https" },
   { id: "integrations", label: "Integrations", icon: <Plug size={16} />, page: () => <Integrations />, keywords: "github gitlab enterprise self-managed token pull requests issues connect" },
   { id: "tools", label: "External Tools", icon: <Wrench size={16} />, page: () => <ExternalTools />, keywords: "merge tool diff tool editor terminal vscode meld kdiff3 beyond compare" },

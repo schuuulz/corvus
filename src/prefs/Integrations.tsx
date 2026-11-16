@@ -3,12 +3,14 @@ import { Ban, CheckCircle2, ExternalLink, Globe, KeyRound, Plug, Server, Trash2 
 import { open } from "@tauri-apps/plugin-dialog";
 import { ext, Integration, IntegrationKind } from "../api";
 import { openExternal } from "../actions";
+import { normalizePath } from "../paths";
 import { useG, useStore } from "../store";
 import { Page, Setting } from "./controls";
 
-interface Provider { kind: IntegrationKind; name: string; selfHosted: boolean; tokenUrl: (host: string) => string; scopes: string; icon: React.ReactNode }
+export interface Provider { kind: IntegrationKind; name: string; selfHosted: boolean; tokenUrl: (host: string) => string; scopes: string; icon: React.ReactNode }
 
-const PROVIDERS: Provider[] = [
+/** The hosting providers Corvus integrates with, in the order they are listed. */
+export const PROVIDERS: Provider[] = [
   { kind: "github", name: "GitHub", selfHosted: false, tokenUrl: () => "https://github.com/settings/tokens/new?scopes=repo,read:user,admin:public_key&description=Corvus", scopes: "repo, read:user, admin:public_key", icon: <Globe size={15} /> },
   { kind: "github-enterprise", name: "GitHub Enterprise Server", selfHosted: true, tokenUrl: (h) => `https://${h}/settings/tokens/new?scopes=repo,read:user,admin:public_key&description=Corvus`, scopes: "repo, read:user, admin:public_key", icon: <Server size={15} /> },
   { kind: "gitlab", name: "GitLab", selfHosted: false, tokenUrl: () => "https://gitlab.com/-/user_settings/personal_access_tokens?name=Corvus&scopes=api,read_user,write_repository", scopes: "api, read_user, write_repository", icon: <Globe size={15} /> },
@@ -54,7 +56,7 @@ function SshBlock({ i, provider }: { i: Integration; provider: Provider }) {
   const browse = async (which: "sshPrivateKey" | "sshPublicKey") => {
     const f = await open({ title: which === "sshPrivateKey" ? "Private SSH key" : "Public SSH key" });
     if (typeof f === "string") {
-      await setG(which, f.replace(/\\/g, "/"));
+      await setG(which, normalizePath(f));
       await setG("sshUseAgent", false);
     }
   };

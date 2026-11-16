@@ -11,6 +11,7 @@ import { Cloud, GitPullRequest } from "lucide-react";
 import { api, ext, Gitflow, GraphRow, LocalBranch, NewPullRequest, OpOutcome, PullRequest, RefLabel, RemoteBranch } from "./api";
 import { fb } from "./feedback";
 import { t, tNodes } from "./i18n";
+import { cloneDestination, normalizePath } from "./paths";
 import { reviewRef, tReview } from "./reviews";
 import { g, gitMessage, MenuEntry, NEW_TAB, r, RepoIntegration, shortSha, useStore } from "./store";
 
@@ -59,18 +60,26 @@ export async function initRepoDialog() {
   }
 }
 
-export async function cloneRepo(url: string, dest: string) {
+/** The first folder cloned into becomes the default; from then on only Preferences changes it. */
+async function adoptDefaultCloneFolder(parentDir: string) {
+  if (!g("cloneParentFolder")) await S().setG("cloneParentFolder", normalizePath(parentDir.trim()));
+}
+
+/** Clones `url` into a folder named after the repository, inside `parentDir`. */
+export async function cloneRepo(url: string, parentDir: string) {
+  const dest = cloneDestination(url, parentDir);
   S().set({ busy: "Cloning", progress: "" });
-  const id = S().notify({ kind: "loading", title: t("op.working", { label: "Clone" }), description: url });
+  const id = S().notify({ kind: "loading", title: t("clone.loading"), description: url });
   S().set({ loadingToast: id });
   try {
     await api.clone(url, dest);
     S().updateToast(id, { kind: "success", title: t("clone.title"), description: dest });
+    await adoptDefaultCloneFolder(parentDir);
     await S().openRepo(dest);
     void notify(t("clone.title"), dest);
     return true;
   } catch (e) {
-    S().updateToast(id, { kind: "error", title: t("op.failed", { label: "Clone" }), description: gitMessage(e) });
+    S().updateToast(id, { kind: "error", title: t("clone.failed"), description: gitMessage(e) });
     return false;
   } finally {
     S().set({ busy: null, loadingToast: null });
