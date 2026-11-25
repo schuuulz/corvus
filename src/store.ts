@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api, ConflictCheck, DiffMode, ext, FileManager, Gitflow, Graph, Integration, RemoteRef, RepoAccess, RepoInfo, Refs, SettingsData, WorkStatus } from "./api";
+import { api, ConflictCheck, DiffMode, ext, Gitflow, Graph, Integration, RemoteRef, RepoAccess, RepoInfo, Refs, SettingsData, SystemApps, WorkStatus } from "./api";
 import { GLOBAL_DEFAULTS, GlobalKey, GlobalSettings, REPO_DEFAULTS, RepoKey, RepoSettings } from "./settings";
 import { t } from "./i18n";
 import type { NoteSection } from "./releaseNotes";
@@ -127,7 +127,6 @@ interface State {
   dialog: DialogReq | null;
   modal: Modal;
   search: string;
-  terminalOpen: boolean;
   logOpen: boolean;
   drawer: null | "left" | "right";
   hoverBranch: string | null;
@@ -142,8 +141,8 @@ interface State {
   pullRequestsVersion: number;
   /** The update found on launch, if any. */
   update: UpdateState | null;
-  /** The system's default file manager (null: none found, so folders can't be opened). */
-  fileManager: FileManager | null;
+  /** The system's default apps that open a folder (null: none found). */
+  systemApps: SystemApps;
 
   init(): Promise<void>;
   setG<K extends GlobalKey>(key: K, value: GlobalSettings[K]): Promise<void>;
@@ -231,7 +230,6 @@ export const useStore = create<State>((set, get) => ({
   dialog: null,
   modal: null,
   search: "",
-  terminalOpen: false,
   logOpen: false,
   drawer: null,
   hoverBranch: null,
@@ -240,7 +238,7 @@ export const useStore = create<State>((set, get) => ({
   repoIntegration: {},
   pullRequestsVersion: 0,
   update: null,
-  fileManager: null,
+  systemApps: { fileManager: null, terminal: null },
 
   async loadGitflow(path) {
     const repo = path ?? get().active;
@@ -262,7 +260,7 @@ export const useStore = create<State>((set, get) => ({
       get().toast(`Could not load settings: ${e}`, "error");
     }
     set({ ready: true });
-    ext.fileManager().then((fileManager) => set({ fileManager }), () => set({ fileManager: null }));
+    ext.systemApps().then((systemApps) => set({ systemApps }), () => {});
     const tabs = g("rememberTabs") ? g("tabs") : [];
     if (!tabs.length) set({ tabs: [NEW_TAB], active: NEW_TAB });
     for (const t of tabs) await get().openRepo(t);

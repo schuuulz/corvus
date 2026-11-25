@@ -302,10 +302,11 @@ export const commit = (message: string, amend: boolean, noVerify: boolean, strip
 
 // --- external tools --------------------------------------------------------
 
-/** The configured tool of `kind`, or null (pointing to the preferences) when none is. */
-function configuredTool(kind: "editor" | "terminal", id: string): string | null {
+/** The configured editor, or null (pointing to the preferences) when none is. */
+function configuredEditor(): string | null {
+  const id = g("editorTool");
   if (id) return id;
-  S().notify({ kind: "warning", title: `No external ${kind} configured`, description: "Choose one in Preferences › External Tools" });
+  S().notify({ kind: "warning", title: "No external editor configured", description: "Choose one in Preferences › External Tools" });
   S().openPrefs("tools");
   return null;
 }
@@ -313,16 +314,15 @@ function configuredTool(kind: "editor" | "terminal", id: string): string | null 
 export async function openInEditor(file?: string) {
   const repo = active();
   if (!repo) return;
-  const id = configuredTool("editor", g("editorTool"));
+  const id = configuredEditor();
   if (id) await ext.openInEditor(id, file ? `${repo}/${file}` : repo).catch((e) => S().toast(gitMessage(e), "error"));
 }
 
-export async function openExternalTerminal() {
-  const repo = active();
-  if (!repo) return;
-  const id = configuredTool("terminal", g("terminalTool"));
-  if (id) await ext.openTerminal(id, repo).catch((e) => S().toast(gitMessage(e), "error"));
-}
+export const openRepoTerminal = () =>
+  S().run("Open terminal", (rp) => ext.openTerminal(rp), {
+    quiet: true,
+    error: (message) => ({ kind: "error", title: t("terminal.open.failed"), description: message }),
+  });
 
 export const openRepoFolder = () =>
   S().run("Open folder", (rp) => ext.openFolder(rp), {

@@ -12,7 +12,7 @@ export const SHORTCUTS: [string, string][] = [
   ["Preferences", "Ctrl+,"],
   ["Search commits", "Ctrl+F"],
   ["Filter branches", "Ctrl+Alt+F"],
-  ["Toggle terminal", "Ctrl+`"],
+  ["Open terminal", "Ctrl+`"],
   ["Toggle left panel", "Ctrl+J"],
   ["Toggle right panel", "Ctrl+K"],
   ["Undo / Redo", "Ctrl+Z / Ctrl+Y"],
@@ -48,7 +48,7 @@ interface Cmd { label: string; hint?: string; run: () => void }
 
 export function CommandPalette() {
   const { repo, data } = useRepo();
-  const fileManager = useStore((s) => s.fileManager);
+  const { fileManager, terminal } = useStore((s) => s.systemApps);
   const { set, setG, openPrefs, newTab } = useStore.getState();
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
@@ -81,15 +81,14 @@ export function CommandPalette() {
         { label: "Stage all changes", hint: "Ctrl+Shift+S", run: A.stageAll },
         { label: "Unstage all changes", hint: "Ctrl+Shift+U", run: A.unstageAll },
         { label: "Show working changes", run: () => useStore.getState().select({ kind: "wip" }) },
-        { label: "Toggle terminal", hint: "Ctrl+`", run: () => set({ terminalOpen: !useStore.getState().terminalOpen }) },
         { label: "Open in external editor", run: () => A.openInEditor() },
-        { label: "Open external terminal", run: A.openExternalTerminal },
         { label: "Gitflow: start feature…", run: () => A.gitflowStart("feature") },
         { label: "Gitflow: start release…", run: () => A.gitflowStart("release") },
         { label: "Gitflow: start hotfix…", run: () => A.gitflowStart("hotfix") },
         { label: "Repository preferences", run: () => openPrefs("repo-commit") },
         { label: "Refresh", hint: "F5", run: () => useStore.getState().refresh() },
       );
+      if (terminal) c.push({ label: "Open terminal", hint: "Ctrl+`", run: A.openRepoTerminal });
       if (fileManager) c.push({ label: `Open in ${fileManager.name}`, run: A.openRepoFolder });
       const head = data?.info?.headBranch;
       const host = A.pullRequestHost();
@@ -98,7 +97,7 @@ export function CommandPalette() {
       for (const b of data?.refs?.locals ?? []) if (!b.isHead) c.push({ label: `Merge ${b.name} into current`, run: () => A.merge(b.name) });
     }
     return c;
-  }, [repo, data?.refs, fileManager]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [repo, data?.refs, fileManager, terminal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   const list = cmds.filter((c) => words.every((w) => c.label.toLowerCase().includes(w))).slice(0, 60);
