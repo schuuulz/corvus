@@ -148,6 +148,7 @@ export interface LogEntry { id: number; time: number; cwd: string; args: string;
 export interface SshKeyPair { privateKey: string; publicKey: string }
 export interface GpgKey { id: string; uid: string; expires: number | null }
 export interface ExternalTool { id: string; name: string; kind: "editor" | "terminal" | "merge"; path: string }
+export interface FileManager { name: string }
 export interface Shell { id: string; name: string; program: string }
 export interface Gitflow { initialized: boolean; master: string; develop: string; feature: string; release: string; hotfix: string; versionTag: string }
 export interface Lfs { installed: boolean; initialized: boolean; patterns: string[] }
@@ -175,6 +176,8 @@ export const ext = {
   detectTools: () => call<ExternalTool[]>("detect_tools"),
   openInEditor: (toolId: string, target: string) => call<void>("open_in_editor", { toolId, target }),
   openTerminal: (toolId: string, dir: string) => call<void>("open_terminal", { toolId, dir }),
+  fileManager: () => call<FileManager | null>("file_manager"),
+  openFolder: (dir: string) => call<void>("open_folder", { dir }),
   openMergeTool: (repo: string, file: string, tool: string | null) => call<void>("open_merge_tool", { repo, file, tool }),
   updaterSupported: () => call<boolean>("updater_supported"),
   termShells: () => call<Shell[]>("term_shells"),

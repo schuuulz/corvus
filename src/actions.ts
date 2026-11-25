@@ -324,6 +324,12 @@ export async function openExternalTerminal() {
   if (id) await ext.openTerminal(id, repo).catch((e) => S().toast(gitMessage(e), "error"));
 }
 
+export const openRepoFolder = () =>
+  S().run("Open folder", (rp) => ext.openFolder(rp), {
+    quiet: true,
+    error: (message) => ({ kind: "error", title: t("folder.open.failed"), description: message }),
+  });
+
 export async function openMergeTool(file: string) {
   const mt = g("mergeTool");
   await S().run("Merge tool", (rp) => ext.openMergeTool(rp, file, mt === "default" ? null : mt), { quiet: true });

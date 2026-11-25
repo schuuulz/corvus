@@ -262,6 +262,84 @@ pub fn open_merge_tool(repo: &str, file: &str, tool_id: Option<&str>) -> Result<
     cli::run(repo, &args).map(|_| ())
 }
 
+// --- file manager ----------------------------------------------------------
+
+/// The system's default file manager: the app that opens folders.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileManager {
+    pub name: String,
+}
+
+/// The default file manager, or `None` when this system has none to open
+/// folders with.
+pub fn file_manager() -> Option<FileManager> {
+    default_file_manager_name().map(|name| FileManager { name })
+}
+
+#[cfg(windows)]
+fn default_file_manager_name() -> Option<String> {
+    let windows = std::env::var("SystemRoot").unwrap_or_else(|_| "C:/Windows".into());
+    Path::new(&windows).join("explorer.exe").exists().then(|| "File Explorer".into())
+}
+
+#[cfg(target_os = "macos")]
+fn default_file_manager_name() -> Option<String> {
+    Path::new("/usr/bin/open").exists().then(|| "Finder".into())
+}
+
+/// The app `xdg-open` hands folders to, named after its desktop entry.
+#[cfg(all(unix, not(target_os = "macos")))]
+fn default_file_manager_name() -> Option<String> {
+    which("xdg-open")?;
+    let desktop_id = run_tool(tool("xdg-mime").args(["query", "default", "inode/directory"])).ok()?;
+    let desktop_id = desktop_id.trim();
+    if desktop_id.is_empty() {
+        return None;
+    }
+    let name = xdg_application_dirs()
+        .into_iter()
+        .find_map(|dir| std::fs::read_to_string(dir.join(desktop_id)).ok())
+        .and_then(|entry| desktop_entry_name(&entry).map(String::from));
+    Some(name.unwrap_or_else(|| desktop_id.trim_end_matches(".desktop").to_string()))
+}
+
+/// Where desktop entries live, most specific first (XDG Base Directory spec).
+#[cfg(all(unix, not(target_os = "macos")))]
+fn xdg_application_dirs() -> Vec<std::path::PathBuf> {
+    let data_home = std::env::var("XDG_DATA_HOME").unwrap_or_else(|_| format!("{}/.local/share", home()));
+    let data_dirs = std::env::var("XDG_DATA_DIRS").unwrap_or_else(|_| "/usr/local/share:/usr/share".into());
+    std::iter::once(data_home.as_str())
+        .chain(data_dirs.split(':'))
+        .filter(|dir| !dir.is_empty())
+        .map(|dir| Path::new(dir).join("applications"))
+        .collect()
+}
+
+/// The untranslated `Name=` of a desktop entry's `[Desktop Entry]` group.
+#[cfg(any(test, all(unix, not(target_os = "macos"))))]
+fn desktop_entry_name(entry: &str) -> Option<&str> {
+    let mut in_main_group = false;
+    for line in entry.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_main_group = line == "[Desktop Entry]";
+        } else if let Some(name) = line.strip_prefix("Name=").filter(|_| in_main_group) {
+            return Some(name.trim()).filter(|n| !n.is_empty());
+        }
+    }
+    None
+}
+
+/// Opens `dir` in the system's default file manager.
+pub fn open_folder(dir: &str) -> Result<()> {
+    // Repository paths use `/`; the Windows shell wants its own separator.
+    let dir = std::path::PathBuf::from(dir.replace('/', std::path::MAIN_SEPARATOR_STR));
+    if !dir.is_dir() {
+        return msg(format!("{} is not a folder", dir.display()));
+    }
+    tauri_plugin_opener::open_path(&dir, None::<&str>).map_err(|e| Error::Msg(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284,5 +362,26 @@ mod tests {
         let args: Vec<_> = c.get_args().map(|a| a.to_string_lossy().into_owned()).collect();
         assert_eq!(args, ["/c", "start", "cmd"]);
         assert_eq!(c.get_current_dir(), Some(Path::new(dir)));
+    }
+
+    #[test]
+    fn desktop_entry_name_reads_the_untranslated_main_name() {
+        let entry = "[Desktop Entry]\nType=Application\nName[pt_BR]=Arquivos\nName=Files\n\n[Desktop Action new-window]\nName=New Window\n";
+        assert_eq!(desktop_entry_name(entry), Some("Files"));
+    }
+
+    #[test]
+    fn desktop_entry_name_ignores_names_outside_the_main_group() {
+        assert_eq!(desktop_entry_name("[Desktop Action open]\nName=Open\n[Desktop Entry]\nType=Application\n"), None);
+        assert_eq!(desktop_entry_name("[Desktop Entry]\nName=\n"), None);
+    }
+
+    #[test]
+    fn open_folder_rejects_files_and_missing_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("README.md");
+        std::fs::write(&file, "readme").unwrap();
+        assert!(open_folder(&file.to_string_lossy()).is_err());
+        assert!(open_folder(&dir.path().join("missing").to_string_lossy()).is_err());
     }
 }

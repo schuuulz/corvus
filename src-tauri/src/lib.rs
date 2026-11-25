@@ -103,6 +103,8 @@ pub fn run() {
             detect_tools,
             open_in_editor,
             open_terminal,
+            file_manager,
+            open_folder,
             open_merge_tool,
             updater_supported,
             term_shells,

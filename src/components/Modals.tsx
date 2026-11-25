@@ -48,6 +48,7 @@ interface Cmd { label: string; hint?: string; run: () => void }
 
 export function CommandPalette() {
   const { repo, data } = useRepo();
+  const fileManager = useStore((s) => s.fileManager);
   const { set, setG, openPrefs, newTab } = useStore.getState();
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
@@ -89,6 +90,7 @@ export function CommandPalette() {
         { label: "Repository preferences", run: () => openPrefs("repo-commit") },
         { label: "Refresh", hint: "F5", run: () => useStore.getState().refresh() },
       );
+      if (fileManager) c.push({ label: `Open in ${fileManager.name}`, run: A.openRepoFolder });
       const head = data?.info?.headBranch;
       const host = A.pullRequestHost();
       if (head && host) c.push({ label: tReview("pr.menu.create", host.integration.kind), run: () => A.openPullRequest(head) });
@@ -96,7 +98,7 @@ export function CommandPalette() {
       for (const b of data?.refs?.locals ?? []) if (!b.isHead) c.push({ label: `Merge ${b.name} into current`, run: () => A.merge(b.name) });
     }
     return c;
-  }, [repo, data?.refs]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [repo, data?.refs, fileManager]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   const list = cmds.filter((c) => words.every((w) => c.label.toLowerCase().includes(w))).slice(0, 60);

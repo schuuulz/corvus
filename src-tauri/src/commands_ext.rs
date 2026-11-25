@@ -144,6 +144,16 @@ pub async fn open_terminal(tool_id: String, dir: String) -> Result<()> {
 }
 
 #[tauri::command]
+pub async fn file_manager() -> Result<Option<system::FileManager>> {
+    Ok(system::file_manager())
+}
+
+#[tauri::command]
+pub async fn open_folder(dir: String) -> Result<()> {
+    system::open_folder(&dir)
+}
+
+#[tauri::command]
 pub async fn open_merge_tool(repo: String, file: String, tool: Option<String>) -> Result<()> {
     system::open_merge_tool(&repo, &file, tool.as_deref())
 }
