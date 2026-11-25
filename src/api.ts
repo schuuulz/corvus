@@ -147,8 +147,9 @@ export interface RemoteRef { host: string; path: string }
 export interface LogEntry { id: number; time: number; cwd: string; args: string; ok: boolean; ms: number; output: string }
 export interface SshKeyPair { privateKey: string; publicKey: string }
 export interface GpgKey { id: string; uid: string; expires: number | null }
-export interface ExternalTool { id: string; name: string; kind: "editor" | "terminal" | "merge"; path: string }
-export interface Shell { id: string; name: string; program: string }
+export interface ExternalTool { id: string; name: string; kind: "editor" | "merge"; path: string }
+export interface SystemApp { name: string }
+export interface SystemApps { fileManager: SystemApp | null; terminal: SystemApp | null }
 export interface Gitflow { initialized: boolean; master: string; develop: string; feature: string; release: string; hotfix: string; versionTag: string }
 export interface Lfs { installed: boolean; initialized: boolean; patterns: string[] }
 export interface Sparse { enabled: boolean; paths: string[] }
@@ -174,15 +175,11 @@ export const ext = {
   gpgGenerate: (program: string, name: string, email: string, passphrase: string) => call<void>("gpg_generate", { program, name, email, passphrase }),
   detectTools: () => call<ExternalTool[]>("detect_tools"),
   openInEditor: (toolId: string, target: string) => call<void>("open_in_editor", { toolId, target }),
-  openTerminal: (toolId: string, dir: string) => call<void>("open_terminal", { toolId, dir }),
+  openTerminal: (dir: string) => call<void>("open_terminal", { dir }),
+  systemApps: () => call<SystemApps>("system_apps"),
+  openFolder: (dir: string) => call<void>("open_folder", { dir }),
   openMergeTool: (repo: string, file: string, tool: string | null) => call<void>("open_merge_tool", { repo, file, tool }),
   updaterSupported: () => call<boolean>("updater_supported"),
-  termShells: () => call<Shell[]>("term_shells"),
-  termSpawn: (id: number, cwd: string, shell: string, cols: number, rows: number) => call<void>("term_spawn", { id, cwd, shell, cols, rows }),
-  termWrite: (id: number, data: string) => call<void>("term_write", { id, data }),
-  termResize: (id: number, cols: number, rows: number) => call<void>("term_resize", { id, cols, rows }),
-  termKill: (id: number) => call<void>("term_kill", { id }),
-  termPromptBranch: (repo: string, branch: string, color: string) => call<void>("term_prompt_branch", { repo, branch, color }),
   gitflow: (repo: string) => call<Gitflow>("gitflow_get", { repo }),
   gitflowInit: (repo: string, g: Omit<Gitflow, "initialized">) => call<void>("gitflow_init", { repo, ...g }),
   gitflowStart: (repo: string, kind: string, name: string) => call<void>("gitflow_start", { repo, kind, name }),

@@ -1,11 +1,11 @@
 import { ReactNode, useEffect, useState } from "react";
 import {
   ArrowLeft, Bell, CheckCircle2, CircleDot, Code2, FileType2, FolderGit2, GitCommitHorizontal, GitMerge, HardDrive, Palette, PenLine, Plug,
-  ScanLine, Search, Settings, Shield, ShieldAlert, SquareTerminal, Webhook, Wrench,
+  ScanLine, Search, Settings, Shield, ShieldAlert, Webhook, Wrench,
 } from "lucide-react";
 import { NEW_TAB, useStore } from "../store";
 import { SearchCtx, useSaved } from "./controls";
-import { EditorPrefs, ExternalTools, General, Notifications, Signing, Ssh, TerminalPrefs, UiCustomization } from "./pages";
+import { EditorPrefs, ExternalTools, General, Notifications, Signing, Ssh, UiCustomization } from "./pages";
 import Integrations from "./Integrations";
 import { CommitPrefs, ConflictPrevention, Encoding, Gitflow, Hooks, IssueTracker, Lfs, SparseCheckout } from "./repoPages";
 
@@ -15,12 +15,11 @@ const SECTIONS: Section[] = [
   { id: "general", label: "General", icon: <Settings size={16} />, page: () => <General />, keywords: "identity name email auto-fetch fetch interval prune submodules conflict default branch clone parent folder orig remember tabs graph commits lazy load git path executable longpaths autocrlf activity log credentials forget" },
   { id: "ssh", label: "SSH", icon: <Shield size={16} />, page: () => <Ssh />, keywords: "ssh agent private public key generate credential manager https" },
   { id: "integrations", label: "Integrations", icon: <Plug size={16} />, page: () => <Integrations />, keywords: "github gitlab enterprise self-managed token pull requests issues connect" },
-  { id: "tools", label: "External Tools", icon: <Wrench size={16} />, page: () => <ExternalTools />, keywords: "merge tool diff tool editor terminal vscode meld kdiff3 beyond compare" },
+  { id: "tools", label: "External Tools", icon: <Wrench size={16} />, page: () => <ExternalTools />, keywords: "merge tool diff tool editor vscode meld kdiff3 beyond compare" },
   { id: "notifications", label: "Notifications", icon: <Bell size={16} />, page: () => <Notifications />, keywords: "desktop notifications" },
   { id: "ui", label: "UI Customization", icon: <Palette size={16} />, page: () => <UiCustomization />, keywords: "theme dark light midnight contrast toast notification location toolbar labels date time format locale avatars hover highlight branch visibility columns author sha description" },
   { id: "signing", label: "Commit Signing", icon: <PenLine size={16} />, page: () => <Signing />, keywords: "gpg sign signing key format program ssh x509 generate commits tags" },
   { id: "editor", label: "Editor", icon: <Code2 size={16} />, page: () => <EditorPrefs />, keywords: "font size tab end of line eol crlf lf syntax highlighting line numbers word wrap monospace" },
-  { id: "terminal", label: "In-App Terminal", icon: <SquareTerminal size={16} />, page: () => <TerminalPrefs />, keywords: "terminal font size line height cursor dim shell powershell bash cmd wsl" },
   { id: "repo-encoding", label: "Encoding", icon: <FileType2 size={16} />, repo: true, page: () => <Encoding />, keywords: "encoding utf-8 utf-16 windows-1252 latin" },
   { id: "repo-gitflow", label: "Gitflow", icon: <GitMerge size={16} />, repo: true, page: () => <Gitflow />, keywords: "gitflow develop feature release hotfix prefix version tag" },
   { id: "repo-hooks", label: "Git Hooks", icon: <Webhook size={16} />, repo: true, page: () => <Hooks />, keywords: "hooks hookspath skip no-verify" },

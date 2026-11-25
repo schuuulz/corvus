@@ -5,8 +5,6 @@ pub mod integrations;
 mod migration;
 pub mod settings;
 pub mod system;
-mod shell_prompt;
-mod terminal;
 mod watcher;
 
 use commands::*;
@@ -22,7 +20,6 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(watcher::Watchers::default())
-        .manage(terminal::Terminals::default())
         .setup(|app| {
             let path = app.path().app_config_dir()?.join("settings.json");
             // A failed copy only means starting from default settings, which
@@ -103,14 +100,10 @@ pub fn run() {
             detect_tools,
             open_in_editor,
             open_terminal,
+            system_apps,
+            open_folder,
             open_merge_tool,
             updater_supported,
-            term_shells,
-            term_prompt_branch,
-            term_spawn,
-            term_write,
-            term_resize,
-            term_kill,
             gitflow_get,
             gitflow_init,
             gitflow_start,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Bell, Code2, Copy, KeyRound, Palette, PenLine, Settings, Shield, SquareTerminal, Wrench } from "lucide-react";
-import { ExternalTool, ext, GpgKey, Shell } from "../api";
+import { Bell, Code2, Copy, KeyRound, Palette, PenLine, Settings, Shield, Wrench } from "lucide-react";
+import { ExternalTool, ext, GpgKey } from "../api";
 import { formatDate, LOCALES } from "../format";
 import { THEMES } from "../settings";
 import { useG, useStore } from "../store";
@@ -116,7 +116,7 @@ export function UiCustomization() {
 const MONO_FONTS = ["Geist Mono", "Cascadia Code", "Cascadia Mono", "Consolas", "JetBrains Mono", "Fira Code", "Source Code Pro", "Hack", "IBM Plex Mono", "Roboto Mono", "Ubuntu Mono", "Courier New", "Lucida Console"];
 const PROP_FONTS = ["Segoe UI", "Arial", "Calibri", "Inter", "Verdana", "Georgia"];
 
-function FontSelect({ k, monoKey, label, help }: { k: "editorFont" | "termFont"; monoKey?: "editorMonoOnly"; label: string; help?: string }) {
+function FontSelect({ k, monoKey, label, help }: { k: "editorFont"; monoKey?: "editorMonoOnly"; label: string; help?: string }) {
   const value = useG(k);
   const monoOnly = useG("editorMonoOnly");
   const { setG } = useStore.getState();
@@ -151,23 +151,6 @@ export function EditorPrefs() {
   );
 }
 
-export function TerminalPrefs() {
-  const [shells, setShells] = useState<Shell[]>([]);
-  useEffect(() => {
-    ext.termShells().then(setShells, () => {});
-  }, []);
-  return (
-    <Page title="In-App Terminal" icon={<SquareTerminal size={20} />} lead="Open the terminal with the toolbar button or Ctrl+`.">
-      <FontSelect k="termFont" label="Font" />
-      <NumberInput k="termFontSize" label="Font size" min={8} max={32} />
-      <NumberInput k="termLineHeight" label="Line height" min={1} max={2} step={0.1} />
-      <Select k="termCursor" label="Cursor style" options={[["bar", "Bar"], ["block", "Block"], ["underline", "Underline"]]} />
-      <Toggle k="termDim" label="Dim terminal when unfocused" />
-      <Select k="termShell" label="Default shell" help="Applies to new terminal tabs." options={shells.map((s) => [s.id, s.name] as const)} />
-    </Page>
-  );
-}
-
 export function Notifications() {
   return (
     <Page title="Notifications" icon={<Bell size={20} />}>
@@ -191,8 +174,6 @@ export function ExternalTools() {
       <Select k="diffTool" label="External diff tool" options={[["merge", "<Use merge tool>"], ...of("merge")]} />
       <h2>Editor</h2>
       <Select k="editorTool" label="External editor" help="Used by “Open in external editor”." options={[["", "<None>"], ...of("editor")]} />
-      <h2>Terminal</h2>
-      <Select k="terminalTool" label="External terminal" help="Used by “Open external terminal” from the repository menu." options={[["", "<None>"], ...of("terminal")]} />
     </Page>
   );
 }

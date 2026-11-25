@@ -1,15 +1,13 @@
-//! Commands for settings, preferences-backed features, tools, terminal and
+//! Commands for settings, preferences-backed features, tools and
 //! integrations.
 
-use crate::git::{self, cli, ext, Error, Result};
+use crate::git::{self, cli, ext, Result};
 use crate::integrations::{self as integ, Kind};
 use crate::settings::Settings;
-use crate::shell_prompt;
 use crate::system;
-use crate::terminal::{self, Terminals};
 use serde::Deserialize;
 use serde_json::Value;
-use tauri::{AppHandle, State};
+use tauri::State;
 
 // --- settings & config -----------------------------------------------------
 
@@ -139,8 +137,18 @@ pub async fn open_in_editor(tool_id: String, target: String) -> Result<()> {
 }
 
 #[tauri::command]
-pub async fn open_terminal(tool_id: String, dir: String) -> Result<()> {
-    system::open_terminal(&tool_id, &dir)
+pub async fn system_apps() -> Result<system::SystemApps> {
+    Ok(system::system_apps())
+}
+
+#[tauri::command]
+pub async fn open_terminal(dir: String) -> Result<()> {
+    system::open_terminal(&dir)
+}
+
+#[tauri::command]
+pub async fn open_folder(dir: String) -> Result<()> {
+    system::open_folder(&dir)
 }
 
 #[tauri::command]
@@ -148,45 +156,13 @@ pub async fn open_merge_tool(repo: String, file: String, tool: Option<String>) -
     system::open_merge_tool(&repo, &file, tool.as_deref())
 }
 
-// --- in-app terminal ---------------------------------------------------------
+// --- updater -----------------------------------------------------------------
 
 /// Whether this installation can update itself. On Linux only AppImages can:
 /// deb and rpm installs belong to the system package manager.
 #[tauri::command]
 pub fn updater_supported() -> bool {
     !cfg!(target_os = "linux") || std::env::var_os("APPIMAGE").is_some()
-}
-
-#[tauri::command]
-pub async fn term_shells() -> Result<Vec<terminal::Shell>> {
-    Ok(terminal::shells())
-}
-
-/// Records the HEAD branch of `repo` and its graph colour for terminal prompts.
-#[tauri::command]
-pub async fn term_prompt_branch(app: AppHandle, repo: String, branch: String, color: String) -> Result<()> {
-    shell_prompt::write_head(&shell_prompt::dir(&app)?, &repo, &branch, &color)
-}
-
-#[tauri::command]
-pub async fn term_spawn(app: AppHandle, state: State<'_, Terminals>, id: u32, cwd: String, shell: String, cols: u16, rows: u16) -> Result<()> {
-    terminal::spawn(app, &state, id, &cwd, &shell, cols, rows).map_err(Error::Msg)
-}
-
-#[tauri::command]
-pub async fn term_write(state: State<'_, Terminals>, id: u32, data: String) -> Result<()> {
-    terminal::write(&state, id, &data).map_err(Error::Msg)
-}
-
-#[tauri::command]
-pub async fn term_resize(state: State<'_, Terminals>, id: u32, cols: u16, rows: u16) -> Result<()> {
-    terminal::resize(&state, id, cols, rows).map_err(Error::Msg)
-}
-
-#[tauri::command]
-pub async fn term_kill(state: State<'_, Terminals>, id: u32) -> Result<()> {
-    terminal::kill(&state, id);
-    Ok(())
 }
 
 // --- repo extras ---------------------------------------------------------------

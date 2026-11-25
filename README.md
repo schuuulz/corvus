@@ -90,9 +90,9 @@ Interactive rebase lets you reorder, squash, fixup, reword or drop commits, and 
 
 ### Keep your hands on the keyboard
 
-A command palette (<kbd>Ctrl</kbd>+<kbd>P</kbd>) runs any action, and an in-app terminal opens in the repository.
+A command palette (<kbd>Ctrl</kbd>+<kbd>P</kbd>) runs any action, and <kbd>Ctrl</kbd>+<kbd>`</kbd> opens the system terminal in the repository.
 
-<img src="docs/screenshots/command-palette.png" alt="Command palette" width="440" /> <img src="docs/screenshots/terminal.png" alt="In-app terminal" width="440" />
+<img src="docs/screenshots/command-palette.png" alt="Command palette" width="440" />
 
 ## Features
 
@@ -131,8 +131,8 @@ A command palette (<kbd>Ctrl</kbd>+<kbd>P</kbd>) runs any action, and an in-app 
   - creating pull requests;
   - SSH key upload.
 - **Tools:**
-  - in-app terminal;
-  - external editor, terminal and merge tool;
+  - system terminal and file manager, opened in the repository;
+  - external editor and merge tool;
   - command palette;
   - activity log.
 - **Preferences:**
