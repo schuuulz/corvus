@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/schuuulz/corvus/compare/corvus-v0.9.0...corvus-v0.10.0) (2026-11-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **terminal:** the in-app terminal and the "External terminal" preference are gone; the system's default terminal is always used.
+
+### Features
+
+* **terminal:** open the system terminal instead of the in-app one ([63b8f57](https://github.com/schuuulz/corvus/commit/63b8f57c4526723e9a3d53d15ddf6fa06fc2d853))
+* **toolbar:** open the repository folder in the system file manager ([33ca32a](https://github.com/schuuulz/corvus/commit/33ca32ac4186e590b0edbd0636e906c4becf5a34))
+
 ## [0.9.0](https://github.com/schuuulz/corvus/compare/corvus-v0.8.0...corvus-v0.9.0) (2026-11-16)
 
 
