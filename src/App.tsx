@@ -15,7 +15,6 @@ import StagingPanel from "./components/StagingPanel";
 import DiffView from "./components/DiffView";
 import MergeEditor, { ConflictPreview } from "./components/MergeEditor";
 import InteractiveRebase from "./components/InteractiveRebase";
-import TerminalDock from "./components/Terminal";
 import NewTab from "./components/NewTab";
 import GitflowPanel from "./components/GitflowPanel";
 import { Blame, FileHistory } from "./components/FileViews";
@@ -53,12 +52,10 @@ function Workspace() {
   const { repo } = useRepo();
   const selection = useStore((s) => (s.active ? s.selection[s.active] : undefined));
   const drawer = useStore((s) => s.drawer);
-  const terminalOpen = useStore((s) => s.terminalOpen);
   const leftW = useG("leftWidth");
   const rightW = useG("rightWidth");
   const leftCollapsed = useG("leftCollapsed");
   const rightCollapsed = useG("rightCollapsed");
-  const termH = useG("terminalHeight");
   const { setG, set, select } = useStore.getState();
   const narrowRight = useNarrow(1280);
   const narrowLeft = useNarrow(960);
@@ -101,14 +98,6 @@ function Workspace() {
             <Center />
           </main>
           <GitflowPanel />
-          {terminalOpen && repo && (
-            <>
-              <Splitter horizontal onDrag={(d) => setG("terminalHeight", clamp(g("terminalHeight") - d, 120, window.innerHeight - 200))} />
-              <div className="term-dock" style={{ height: termH }}>
-                <TerminalDock cwd={repo} />
-              </div>
-            </>
-          )}
         </div>
 
         {/* right panel: only while a commit or the working changes are selected */}
@@ -151,14 +140,14 @@ function useShortcuts() {
     const onKey = (e: KeyboardEvent) => {
       const s = useStore.getState();
       const typing = e.target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
-      const inEditor = e.target instanceof HTMLElement && !!e.target.closest(".monaco-editor, .xterm");
+      const inEditor = e.target instanceof HTMLElement && !!e.target.closest(".monaco-editor");
       const k = e.key.toLowerCase();
       const hasRepo = !!s.active && s.active !== NEW_TAB;
       const zoom = (z: number) => s.setG("zoom", Math.round(Math.min(2, Math.max(0.6, z)) * 10) / 10);
       if (e.ctrlKey && (k === "=" || k === "+")) return e.preventDefault(), zoom(g("zoom") + 0.1);
       if (e.ctrlKey && k === "-") return e.preventDefault(), zoom(g("zoom") - 0.1);
       if (e.ctrlKey && k === "0") return e.preventDefault(), zoom(1);
-      if (e.ctrlKey && k === "`") return e.preventDefault(), hasRepo && s.set({ terminalOpen: !s.terminalOpen });
+      if (e.ctrlKey && k === "`") return e.preventDefault(), hasRepo && A.openRepoTerminal();
       if (inEditor) return;
       if (e.ctrlKey && k === "p") {
         e.preventDefault();

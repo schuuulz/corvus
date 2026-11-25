@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Archive, ArchiveRestore, Bell, ChevronDown, ChevronRight, Command, FolderGit2,
+  AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Archive, ArchiveRestore, Bell, ChevronDown, ChevronRight, Command, FolderGit2, FolderOpen,
   GitBranch, GitFork, Keyboard, ListTree, Minus, PanelLeftOpen, PanelRightOpen, Plus, Redo2, RefreshCw, ScrollText, Search, Settings, Terminal,
   Trash2, Undo2, X, ZoomIn,
 } from "lucide-react";
@@ -133,7 +133,7 @@ export function Toolbar() {
   const redoCount = useStore((s) => (repo ? s.redo[repo]?.length ?? 0 : 0));
   const search = useStore((s) => s.search);
   const tabs = useStore((s) => s.tabs);
-  const terminalOpen = useStore((s) => s.terminalOpen);
+  const { fileManager, terminal } = useStore((s) => s.systemApps);
   const { set, setG, openMenu, setActive } = useStore.getState();
   const head = data?.info?.headBranch;
   const local = data?.refs?.locals.find((b) => b.isHead);
@@ -147,7 +147,8 @@ export function Toolbar() {
       { label: "Open repository…", action: A.openRepoDialog },
       { label: "Clone repository…", action: () => set({ modal: "clone" }) },
       { label: "Open in external editor", action: () => A.openInEditor() },
-      { label: "Open external terminal", action: A.openExternalTerminal },
+      { label: "Open terminal", action: A.openRepoTerminal, disabled: !terminal },
+      { label: `Open in ${fileManager?.name ?? "file manager"}`, action: A.openRepoFolder, disabled: !fileManager },
     ]);
 
   const branchMenu = async (e: React.MouseEvent) => {
@@ -219,7 +220,20 @@ export function Toolbar() {
         <Tool icon={<Archive size={17} />} label="Stash" onClick={A.stash} disabled={!!busy || !dirty} />
         <Tool icon={<ArchiveRestore size={17} />} label="Pop" onClick={A.pop} disabled={!!busy || !stashes} />
         <div className="tool-sep" />
-        <Tool icon={<Terminal size={17} />} label="Terminal" onClick={() => set({ terminalOpen: !terminalOpen })} title="Terminal (Ctrl+`)" />
+        <Tool
+          icon={<Terminal size={17} />}
+          label="Terminal"
+          onClick={A.openRepoTerminal}
+          disabled={!terminal}
+          title={terminal ? `Open in ${terminal.name} (Ctrl+\`)` : "No terminal found"}
+        />
+        <Tool
+          icon={<FolderOpen size={17} />}
+          label="Folder"
+          onClick={A.openRepoFolder}
+          disabled={!fileManager}
+          title={fileManager ? `Open in ${fileManager.name}` : "No file manager found"}
+        />
       </div>
       <div className="toolbar-right">
         <div className="search-box">

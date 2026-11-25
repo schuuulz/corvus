@@ -57,13 +57,6 @@ export const GLOBAL_DEFAULTS = {
   editorSyntax: true,
   editorLineNumbers: true,
   editorWordWrap: false,
-  // terminal
-  termFont: "Geist Mono",
-  termFontSize: 13,
-  termLineHeight: 1.2,
-  termCursor: "bar" as "bar" | "block" | "underline",
-  termDim: true,
-  termShell: "powershell",
   // notifications
   desktopNotifications: false,
   // ssh
@@ -74,7 +67,6 @@ export const GLOBAL_DEFAULTS = {
   mergeTool: "default",
   diffTool: "merge",
   editorTool: "",
-  terminalTool: "",
   // integrations
   integrations: [] as Integration[],
   defaultIssueTracker: "",
@@ -83,7 +75,6 @@ export const GLOBAL_DEFAULTS = {
   rightWidth: 380,
   leftCollapsed: false,
   rightCollapsed: false,
-  terminalHeight: 260,
   zoom: 1,
   /** Default commit table column widths, for repositories without their own. */
   colWidths: { refs: 190, message: 520, author: 140, date: 150, sha: 70 } as Record<string, number>,

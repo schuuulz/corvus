@@ -3,7 +3,7 @@
 
 use crate::git::{cli, msg, Error, Result};
 use serde::Serialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const SERVICE: &str = "corvus";
@@ -145,7 +145,7 @@ pub fn gpg_generate(program: &str, name: &str, email: &str, passphrase: &str) ->
 pub struct ExternalTool {
     pub id: &'static str,
     pub name: &'static str,
-    /// "editor" | "terminal" | "merge"
+    /// "editor" | "merge"
     pub kind: &'static str,
     pub path: String,
 }
@@ -173,11 +173,6 @@ pub fn detect_tools() -> Vec<ExternalTool> {
         ("sublime", "Sublime Text", "editor", vec![format!("{pf}/Sublime Text/sublime_text.exe")], "subl"),
         ("notepadpp", "Notepad++", "editor", vec![format!("{pf}/Notepad++/notepad++.exe"), format!("{pf86}/Notepad++/notepad++.exe")], "notepad++"),
         ("idea", "IntelliJ IDEA", "editor", vec![], "idea64"),
-        ("wt", "Windows Terminal", "terminal", vec![format!("{local}/Microsoft/WindowsApps/wt.exe")], "wt"),
-        ("pwsh", "PowerShell 7", "terminal", vec![format!("{pf}/PowerShell/7/pwsh.exe")], "pwsh"),
-        ("powershell", "Windows PowerShell", "terminal", vec![], "powershell"),
-        ("gitbash", "Git Bash", "terminal", vec![format!("{pf}/Git/git-bash.exe")], "git-bash"),
-        ("cmd", "Command Prompt", "terminal", vec![], "cmd"),
         ("vscode-merge", "Visual Studio Code", "merge", vec![], "code"),
         ("meld", "Meld", "merge", vec![format!("{pf}/Meld/Meld.exe"), format!("{pf86}/Meld/Meld.exe")], "meld"),
         ("kdiff3", "KDiff3", "merge", vec![format!("{pf}/KDiff3/kdiff3.exe")], "kdiff3"),
@@ -217,42 +212,6 @@ pub fn open_in_editor(tool_id: &str, target: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn open_terminal(tool_id: &str, dir: &str) -> Result<()> {
-    let terminal = detected_tool("terminal", tool_id)?;
-    terminal_command(terminal.id, &terminal.path, dir).spawn()?;
-    Ok(())
-}
-
-/// The command that opens `tool_path` (a terminal from `detect_tools`) in `dir`.
-fn terminal_command(tool_id: &str, tool_path: &str, dir: &str) -> Command {
-    let mut c = Command::new(tool_path);
-    match tool_id {
-        "wt" => {
-            c.args(["-d", dir]);
-        }
-        "gitbash" => {
-            c.arg(format!("--cd={dir}"));
-        }
-        "cmd" => {
-            // The new window starts in our working directory: a `cd` command
-            // line would let a `"` in the path end the quoting.
-            c.args(["/c", "start", "cmd"]);
-        }
-        "pwsh" | "powershell" => {
-            c.args(["-NoExit", "-Command", &format!("Set-Location -LiteralPath '{}'", dir.replace('\'', "''"))]);
-            #[cfg(windows)]
-            {
-                use std::os::windows::process::CommandExt;
-                const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
-                c.creation_flags(CREATE_NEW_CONSOLE);
-            }
-        }
-        _ => {}
-    }
-    c.current_dir(dir);
-    c
-}
-
 pub fn open_merge_tool(repo: &str, file: &str, tool_id: Option<&str>) -> Result<()> {
     let mut args = vec!["mergetool", "--no-prompt"];
     if let Some(t) = tool_id.filter(|t| !t.is_empty() && *t != "default") {
@@ -260,6 +219,177 @@ pub fn open_merge_tool(repo: &str, file: &str, tool_id: Option<&str>) -> Result<
     }
     args.extend(["--", file]);
     cli::run(repo, &args).map(|_| ())
+}
+
+// --- system apps -----------------------------------------------------------
+
+/// One of the system's default apps, as the UI names it.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemApp {
+    pub name: String,
+}
+
+/// The system's default apps that open a folder: `None` when there is none.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemApps {
+    pub file_manager: Option<SystemApp>,
+    pub terminal: Option<SystemApp>,
+}
+
+pub fn system_apps() -> SystemApps {
+    SystemApps {
+        file_manager: default_file_manager_name().map(|name| SystemApp { name }),
+        terminal: default_terminal().map(|t| SystemApp { name: t.name.into() }),
+    }
+}
+
+/// `dir` as an existing folder. Repository paths use `/`; the Windows shell
+/// wants its own separator.
+fn existing_dir(dir: &str) -> Result<PathBuf> {
+    let dir = PathBuf::from(dir.replace('/', std::path::MAIN_SEPARATOR_STR));
+    if !dir.is_dir() {
+        return msg(format!("{} is not a folder", dir.display()));
+    }
+    Ok(dir)
+}
+
+// --- terminal ----------------------------------------------------------------
+
+/// The system's default terminal: what to call it and the program to start.
+struct Terminal {
+    name: &'static str,
+    program: PathBuf,
+}
+
+/// Windows PowerShell, the shell every Windows has. Given a console of its
+/// own, Windows hands it to the default terminal app (Windows Terminal or the
+/// classic console, per Settings › Terminal).
+#[cfg(windows)]
+fn default_terminal() -> Option<Terminal> {
+    let windows = std::env::var("SystemRoot").unwrap_or_else(|_| "C:/Windows".into());
+    let program = Path::new(&windows).join("System32/WindowsPowerShell/v1.0/powershell.exe");
+    program.exists().then_some(Terminal { name: "Terminal", program })
+}
+
+/// Terminal.app: macOS has no setting for a default terminal.
+#[cfg(target_os = "macos")]
+fn default_terminal() -> Option<Terminal> {
+    let program = PathBuf::from("/usr/bin/open");
+    program.exists().then_some(Terminal { name: "Terminal", program })
+}
+
+/// Linux terminals, the desktop's own choice first: `xdg-terminal-exec`
+/// (the XDG default terminal) and `x-terminal-emulator` (Debian's).
+#[cfg(all(unix, not(target_os = "macos")))]
+const LINUX_TERMINALS: [(&str, &str); 6] = [
+    ("xdg-terminal-exec", "Terminal"),
+    ("x-terminal-emulator", "Terminal"),
+    ("gnome-terminal", "GNOME Terminal"),
+    ("konsole", "Konsole"),
+    ("xfce4-terminal", "Xfce Terminal"),
+    ("xterm", "XTerm"),
+];
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn default_terminal() -> Option<Terminal> {
+    LINUX_TERMINALS
+        .iter()
+        .find_map(|&(bin, name)| which(bin).map(|program| Terminal { name, program: program.into() }))
+}
+
+/// Opens the system's default terminal in `dir`.
+pub fn open_terminal(dir: &str) -> Result<()> {
+    let dir = existing_dir(dir)?;
+    let Some(terminal) = default_terminal() else {
+        return msg("No terminal found on this system");
+    };
+    terminal_command(&terminal.program, &dir).spawn()?;
+    Ok(())
+}
+
+/// The command that starts `program` (from `default_terminal`) in `dir`.
+/// The terminal inherits `dir` as its working directory, so no shell ever
+/// parses the path.
+#[cfg(windows)]
+fn terminal_command(program: &Path, dir: &Path) -> Command {
+    // Started directly, the shell would inherit our redirected standard
+    // handles, read end-of-input and exit at once. `start` gives it a console
+    // of its own; the hidden `cmd` that runs it exits straight away.
+    let mut c = tool("cmd");
+    c.args(["/c", "start", ""]).arg(program).current_dir(dir);
+    c
+}
+
+#[cfg(not(windows))]
+fn terminal_command(program: &Path, dir: &Path) -> Command {
+    let mut c = Command::new(program);
+    c.current_dir(dir);
+    #[cfg(target_os = "macos")]
+    c.args(["-a", "Terminal"]).arg(dir);
+    c
+}
+
+// --- file manager ----------------------------------------------------------
+
+#[cfg(windows)]
+fn default_file_manager_name() -> Option<String> {
+    let windows = std::env::var("SystemRoot").unwrap_or_else(|_| "C:/Windows".into());
+    Path::new(&windows).join("explorer.exe").exists().then(|| "File Explorer".into())
+}
+
+#[cfg(target_os = "macos")]
+fn default_file_manager_name() -> Option<String> {
+    Path::new("/usr/bin/open").exists().then(|| "Finder".into())
+}
+
+/// The app `xdg-open` hands folders to, named after its desktop entry.
+#[cfg(all(unix, not(target_os = "macos")))]
+fn default_file_manager_name() -> Option<String> {
+    which("xdg-open")?;
+    let desktop_id = run_tool(tool("xdg-mime").args(["query", "default", "inode/directory"])).ok()?;
+    let desktop_id = desktop_id.trim();
+    if desktop_id.is_empty() {
+        return None;
+    }
+    let name = xdg_application_dirs()
+        .into_iter()
+        .find_map(|dir| std::fs::read_to_string(dir.join(desktop_id)).ok())
+        .and_then(|entry| desktop_entry_name(&entry).map(String::from));
+    Some(name.unwrap_or_else(|| desktop_id.trim_end_matches(".desktop").to_string()))
+}
+
+/// Where desktop entries live, most specific first (XDG Base Directory spec).
+#[cfg(all(unix, not(target_os = "macos")))]
+fn xdg_application_dirs() -> Vec<std::path::PathBuf> {
+    let data_home = std::env::var("XDG_DATA_HOME").unwrap_or_else(|_| format!("{}/.local/share", home()));
+    let data_dirs = std::env::var("XDG_DATA_DIRS").unwrap_or_else(|_| "/usr/local/share:/usr/share".into());
+    std::iter::once(data_home.as_str())
+        .chain(data_dirs.split(':'))
+        .filter(|dir| !dir.is_empty())
+        .map(|dir| Path::new(dir).join("applications"))
+        .collect()
+}
+
+/// The untranslated `Name=` of a desktop entry's `[Desktop Entry]` group.
+#[cfg(any(test, all(unix, not(target_os = "macos"))))]
+fn desktop_entry_name(entry: &str) -> Option<&str> {
+    let mut in_main_group = false;
+    for line in entry.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_main_group = line == "[Desktop Entry]";
+        } else if let Some(name) = line.strip_prefix("Name=").filter(|_| in_main_group) {
+            return Some(name.trim()).filter(|n| !n.is_empty());
+        }
+    }
+    None
+}
+
+/// Opens `dir` in the system's default file manager.
+pub fn open_folder(dir: &str) -> Result<()> {
+    let dir = existing_dir(dir)?;
+    tauri_plugin_opener::open_path(&dir, None::<&str>).map_err(|e| Error::Msg(e.to_string()))
 }
 
 #[cfg(test)]
@@ -278,11 +408,44 @@ mod tests {
     }
 
     #[test]
-    fn cmd_terminal_keeps_the_directory_out_of_its_command_line() {
-        let dir = "C:/repos/a\" & calc & \"b";
-        let c = terminal_command("cmd", "cmd.exe", dir);
+    fn terminal_keeps_the_directory_out_of_its_command_line() {
+        let dir = Path::new("C:/repos/a\" & calc & 'b");
+        let c = terminal_command(Path::new("shell"), dir);
         let args: Vec<_> = c.get_args().map(|a| a.to_string_lossy().into_owned()).collect();
-        assert_eq!(args, ["/c", "start", "cmd"]);
-        assert_eq!(c.get_current_dir(), Some(Path::new(dir)));
+        assert!(args.iter().all(|a| !a.contains("calc")), "{args:?}");
+        assert_eq!(c.get_current_dir(), Some(dir));
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn windows_terminal_gets_a_console_of_its_own() {
+        let c = terminal_command(Path::new("powershell.exe"), Path::new("C:/repo"));
+        let args: Vec<_> = c.get_args().map(|a| a.to_string_lossy().into_owned()).collect();
+        assert_eq!(c.get_program(), "cmd");
+        assert_eq!(args, ["/c", "start", "", "powershell.exe"]);
+    }
+
+    #[test]
+    fn open_terminal_and_folder_reject_files_and_missing_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("README.md");
+        std::fs::write(&file, "readme").unwrap();
+        for path in [file, dir.path().join("missing")] {
+            let path = path.to_string_lossy();
+            assert!(open_terminal(&path).is_err());
+            assert!(open_folder(&path).is_err());
+        }
+    }
+
+    #[test]
+    fn desktop_entry_name_reads_the_untranslated_main_name() {
+        let entry = "[Desktop Entry]\nType=Application\nName[pt_BR]=Arquivos\nName=Files\n\n[Desktop Action new-window]\nName=New Window\n";
+        assert_eq!(desktop_entry_name(entry), Some("Files"));
+    }
+
+    #[test]
+    fn desktop_entry_name_ignores_names_outside_the_main_group() {
+        assert_eq!(desktop_entry_name("[Desktop Action open]\nName=Open\n[Desktop Entry]\nType=Application\n"), None);
+        assert_eq!(desktop_entry_name("[Desktop Entry]\nName=\n"), None);
     }
 }
